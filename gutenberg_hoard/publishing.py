@@ -272,8 +272,6 @@ def _export_native_pdf_locked(publication_id: str) -> dict:
             if page_count != pub["page_count"]:
                 raise RuntimeError(f"expected {pub['page_count']} pages, found {page_count}")
             extracted_text = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
-        except RuntimeError as exc:
-            raise RuntimeError(f"Native PDF verification failed: {exc}") from exc
         except Exception as exc:
             raise RuntimeError(f"Native PDF verification failed: {exc}") from exc
         engine_warnings = payload.get("warnings") or []
@@ -282,10 +280,10 @@ def _export_native_pdf_locked(publication_id: str) -> dict:
         if not isinstance(engine_warnings, list):
             engine_warnings = [engine_warnings]
         warnings = [json.dumps(warning, ensure_ascii=False) if isinstance(warning, dict) else str(warning)
-                    for warning in engine_warnings]
+                    for warning in engine_warnings if warning is not None]
         try:
             os.replace(temp_path, output_path)
-        except PermissionError as exc:
+        except OSError as exc:
             raise RuntimeError(f"Native PDF export could not replace destination '{output_path}'; it may be open or locked: {exc}") from exc
         byte_count = output_path.stat().st_size
         _emit("publication.exported", {"publication_id": publication_id, "format": "pdf-native", "pages": page_count})

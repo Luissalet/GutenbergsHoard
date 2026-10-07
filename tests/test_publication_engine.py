@@ -155,7 +155,7 @@ def test_native_pdf_export_uses_native_command_and_reports_artifact_warnings(mon
         with target.open("wb") as stream:
             writer.write(stream)
         receipt = {"path": str(target), "bytes": target.stat().st_size, "pages": 2,
-                   "warnings": ["A soft effect was rasterized.", {"font": "Café Sans", "action": "embedded"}]}
+                   "warnings": [None, "A soft effect was rasterized.", {"font": "Café Sans", "action": "embedded"}, None]}
         return [{"name": "execute", "is_error": False, "result": {"content": [
             {"type": "text", "text": json.dumps(receipt)}]}}]
 
@@ -212,7 +212,8 @@ def test_native_pdf_export_failures_keep_existing_target_and_remove_temp(monkeyp
     assert not list(output.parent.glob(".*.tmp.pdf"))
 
 
-def test_native_pdf_replace_permission_error_is_structured_and_cleans_temp(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.parametrize("replace_error", [PermissionError("destination is open"), OSError(17, "destination exists")])
+def test_native_pdf_replace_permission_error_is_structured_and_cleans_temp(monkeypatch: pytest.MonkeyPatch, replace_error: OSError):
     from pypdf import PdfWriter
 
     pub = create_two_pages()
@@ -231,7 +232,7 @@ def test_native_pdf_replace_permission_error_is_structured_and_cleans_temp(monke
             {"type": "text", "text": json.dumps({"path": str(target), "pages": 2})}]}}]
 
     def deny_replace(source, destination):
-        raise PermissionError("destination is open")
+        raise replace_error
 
     monkeypatch.setattr(publishing.native, "run", fake_native_run)
     monkeypatch.setattr(publishing.os, "replace", deny_replace)
