@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "gutenberg",
+  "name": "Gutenberg's Hoard",
+  "purpose": "Local paginated editorial publishing desk using DesignCraft's native layout engine and complete MCP control surface.",
+  "capabilities": [
+    "publication-catalog",
+    "native-designcraft-documents",
+    "native-designcraft-mcp-discovery",
+    "native-designcraft-mcp-dispatch",
+    "persistent-designcraft-sessions",
+    "editorial-page-preview",
+    "multipage-raster-pdf",
+    "hoard-source-references",
+    "hub-work-profiles"
+  ],
+  "placeholders": ["GUTENBERG_DIR", "PYTHON", "APP_URL", "TOKEN_FILE"],
+  "defaults": {
+    "APP_URL": "http://127.0.0.1:5218",
+    "TOKEN_FILE": "{GUTENBERG_DIR}/data/mcp-token",
+    "PYTHON": "{GUTENBERG_DIR}/.venv/Scripts/python.exe"
+  },
+  "app": {
+    "url_default": "{APP_URL}",
+    "ui_url": "{APP_URL}",
+    "health": {"path": "/api/health", "expect": {"service": "gutenbergs-hoard"}},
+    "identify": {"service": ["gutenbergs-hoard"], "title": ["gutenberg's hoard", "gutenberg"]},
+    "launch_hint": {
+      "kind": "process",
+      "executable": "{PYTHON}",
+      "argv": ["-m", "gutenberg_hoard"],
+      "cwd": "{GUTENBERG_DIR}",
+      "env": {
+        "GUTENBERG_HOST": "127.0.0.1",
+        "GUTENBERG_PORT": "5218",
+        "GUTENBERG_PORT_STRICT": "1",
+        "GUTENBERG_DATA_DIR": "{GUTENBERG_DIR}/data"
+      },
+      "readiness": {"url": "{APP_URL}/api/health", "timeout_s": 25}
+    }
+  },
+  "x-family": {"agent_contract": true, "stack": "python"},
+  "mcp": {
+    "transport": "stdio",
+    "command": "{PYTHON}",
+    "args": ["-m", "gutenberg_hoard.mcp_server"],
+    "cwd": "{GUTENBERG_DIR}",
+    "env": {
+      "GUTENBERG_DATA_DIR": "{GUTENBERG_DIR}/data",
+      "HOARD_APP_ID": "gutenberg",
+      "HOARD_TOKEN_FILE": "{TOKEN_FILE}"
+    },
+    "optional_env": ["HOARD_HUB_URL"]
+  },
+  "notes": "HoardLink is installed editable into the dedicated .venv. DesignCraft is configured in ignored local-config.json and remains a separate upstream executable. PDF output is verified multipage RGB raster with non-searchable text; this plugin does not claim native vector PDF or PDF/X. MCP session and native document history is owned by the DesignCraft process while active; Gutenberg snapshots allow undo after restart."
+}
