@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -130,8 +131,169 @@ def test_real_two_page_preview_and_verified_raster_pdf():
     reader = PdfReader(export["path"])
     assert len(reader.pages) == 2
     assert all(not page.extract_text() for page in reader.pages)
+    assert export["renderer"] == "raster"
     assert export["kind"] == "raster" and export["colour_space"] == "RGB"
     assert export["searchable_text"] is False
+
+
+def test_native_pdf_export_uses_native_command_and_reports_artifact_warnings(monkeypatch: pytest.MonkeyPatch):
+    from pypdf import PdfWriter
+
+    pub = create_two_pages()
+    source = Path(pub["path"])
+    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    calls = []
+
+    def fake_native_run(actions, **kwargs):
+        calls.append((actions, kwargs))
+        action = actions[0]
+        assert action["arguments"]["command"] == "file.exportPdf"
+        target = Path(action["arguments"]["params"]["path"])
+        writer = PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        writer.add_blank_page(width=595, height=842)
+        with target.open("wb") as stream:
+            writer.write(stream)
+        receipt = {"path": str(target), "bytes": target.stat().st_size, "pages": 2,
+                   "warnings": ["A soft effect was rasterized.", {"font": "Café Sans", "action": "embedded"}]}
+        return [{"name": "execute", "is_error": False, "result": {"content": [
+            {"type": "text", "text": json.dumps(receipt)}]}}]
+
+    monkeypatch.setattr(publishing.native, "run", fake_native_run)
+    result = publishing.export_pdf(pub["id"], renderer="native")
+
+    assert len(calls) == 1
+    actions, kwargs = calls[0]
+    assert kwargs == {"session_id": pub["id"], "open_path": source}
+    assert actions[0]["arguments"]["params"]["tagged"] is True
+    assert result["renderer"] == "native" and result["pages"] == 2
+    assert result["warnings"] == ["A soft effect was rasterized.", '{"font": "Café Sans", "action": "embedded"}']
+    assert result["text_searchability"]["status"] == "no-text-extracted"
+    assert result["searchable_text"] is False
+    assert Path(result["path"]).name.endswith("-native.pdf")
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
+    assert not list(Path(result["path"]).parent.glob("*.tmp.pdf"))
+
+
+@pytest.mark.parametrize("failure", ["engine", "corrupt-pdf", "wrong-pages"])
+def test_native_pdf_export_failures_keep_existing_target_and_remove_temp(monkeypatch: pytest.MonkeyPatch, failure: str):
+    from pypdf import PdfWriter
+
+    pub = create_two_pages()
+    output = store.publication_dir() / f"{Path(pub['path']).stem}-native.pdf"
+    old_bytes = b"previous verified PDF remains intact"
+    output.write_bytes(old_bytes)
+
+    def fake_native_run(actions, **kwargs):
+        target = Path(actions[0]["arguments"]["params"]["path"])
+        if failure == "engine":
+            raise RuntimeError("injected DesignCraft engine failure")
+        if failure == "corrupt-pdf":
+            target.write_bytes(b"not a readable PDF" * 20)
+        else:
+            writer = PdfWriter()
+            writer.add_blank_page(width=595, height=842)
+            with target.open("wb") as stream:
+                writer.write(stream)
+        return [{"name": "execute", "is_error": False, "result": {"content": [
+            {"type": "text", "text": json.dumps({"path": str(target), "pages": 2})}]}}]
+
+    monkeypatch.setattr(publishing.native, "run", fake_native_run)
+    with pytest.raises(RuntimeError) as error:
+        publishing.export_pdf(pub["id"], renderer="native")
+
+    if failure == "corrupt-pdf":
+        assert "Native PDF verification failed" in str(error.value)
+    elif failure == "wrong-pages":
+        assert "expected 2 pages, found 1" in str(error.value)
+    else:
+        assert "injected DesignCraft engine failure" in str(error.value)
+    assert output.read_bytes() == old_bytes
+    assert not list(output.parent.glob(".*.tmp.pdf"))
+
+
+def test_native_pdf_replace_permission_error_is_structured_and_cleans_temp(monkeypatch: pytest.MonkeyPatch):
+    from pypdf import PdfWriter
+
+    pub = create_two_pages()
+    output = store.publication_dir() / f"{Path(pub['path']).stem}-native.pdf"
+    old_bytes = b"previous verified PDF remains intact"
+    output.write_bytes(old_bytes)
+
+    def fake_native_run(actions, **kwargs):
+        target = Path(actions[0]["arguments"]["params"]["path"])
+        writer = PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        writer.add_blank_page(width=595, height=842)
+        with target.open("wb") as stream:
+            writer.write(stream)
+        return [{"name": "execute", "is_error": False, "result": {"content": [
+            {"type": "text", "text": json.dumps({"path": str(target), "pages": 2})}]}}]
+
+    def deny_replace(source, destination):
+        raise PermissionError("destination is open")
+
+    monkeypatch.setattr(publishing.native, "run", fake_native_run)
+    monkeypatch.setattr(publishing.os, "replace", deny_replace)
+    with pytest.raises(RuntimeError, match="could not replace destination.*open or locked"):
+        publishing.export_pdf(pub["id"], renderer="native")
+    assert output.read_bytes() == old_bytes
+    assert not list(output.parent.glob(".*.tmp.pdf"))
+
+
+def test_native_pdf_null_warnings_are_empty(monkeypatch: pytest.MonkeyPatch):
+    from pypdf import PdfWriter
+
+    pub = create_two_pages()
+
+    def fake_native_run(actions, **kwargs):
+        target = Path(actions[0]["arguments"]["params"]["path"])
+        writer = PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        writer.add_blank_page(width=595, height=842)
+        with target.open("wb") as stream:
+            writer.write(stream)
+        return [{"name": "execute", "is_error": False, "result": {"content": [
+            {"type": "text", "text": json.dumps({"path": str(target), "pages": 2, "warnings": None})}]}}]
+
+    monkeypatch.setattr(publishing.native, "run", fake_native_run)
+    assert publishing.export_pdf(pub["id"], renderer="native")["warnings"] == []
+
+
+def test_real_native_pdf_preserves_unicode_text_and_vector_path():
+    pub = create_two_pages()
+    expected_text = "Acci\u00f3n, ping\u00fcino, fa\u00e7ade \u2014 a\u00f1o 2026"
+    add_text(pub["id"], expected_text)
+    publishing.native_actions(pub["id"], [{"name": "execute", "arguments": {
+        "command": "path.create", "params": {"spread": 0, "closed": False, "anchors": [
+            {"p": [70, 240], "out": [130, 170]},
+            {"p": [250, 240], "in": [190, 310], "out": [310, 170]},
+            {"p": [430, 240], "in": [370, 310]},
+        ]}}}])
+
+    exported = publishing.export_pdf(pub["id"], renderer="native")
+    from pypdf import PdfReader
+    reader = PdfReader(exported["path"])
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    vector_ops = reader.pages[0].get_contents().get_data()
+
+    assert expected_text.replace(" ", "") in re.sub(r"\s+", "", text)
+    assert re.search(rb"(?<!\S)c(?:\s|$)", vector_ops), "expected cubic Bezier path operators in native PDF"
+    assert exported["searchable_text"] is True
+    assert exported["text_searchability"]["status"] == "text-extracted"
+    assert exported["warnings"] == []
+
+
+def test_named_pdf_export_contract_keeps_raster_compatibility_default():
+    from gutenberg_hoard.agent_tools import PdfArgs
+    from gutenberg_hoard.app import PdfExport
+    from gutenberg_hoard.mcp_server import gutenberg_export_pdf
+
+    assert PdfArgs.model_fields["renderer"].default == "raster"
+    assert PdfExport.model_fields["renderer"].default == "raster"
+    assert set(PdfArgs.model_fields["renderer"].annotation.__args__) == {"native", "raster"}
+    assert "renderer" in __import__("inspect").signature(gutenberg_export_pdf).parameters
+    assert __import__("inspect").signature(gutenberg_export_pdf).parameters["renderer"].default == "raster"
 
 
 def test_native_catalogue_is_live_and_unfiltered():

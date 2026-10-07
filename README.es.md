@@ -2,7 +2,7 @@
 
 **Un espacio local para publicaciones editoriales paginadas.** Gutenberg organiza los documentos de publicación y sus referencias de origen. DesignCraft es responsable de la maquetación nativa, las historias, los marcos, las páginas maestras, los estilos, las muestras de color, el historial y el renderizado.
 
-Esta primera versión es operativa, pero no afirma paridad con las suites de autoedición. El motor verificado es DesignCraft `0.2.1` (commit de lanzamiento `80b3e3c`, 2026-10-06), con licencia MIT o Apache-2.0. Su README incluye el formato `.designcraft`, importación/exportación IDML y exportación PNG; el PDF nativo sigue en su hoja de ruta. Gutenberg conserva todo el catálogo MCP nativo y su vía de llamada, y añade catálogo de publicaciones, referencias de origen, espacio de páginas, sesiones de agente persistentes, instantáneas y deshacer, vistas previas y exportación PDF multipágina verificada.
+Esta primera versión es operativa, pero no afirma paridad con las suites de autoedición. El motor verificado es DesignCraft `0.2.1` (commit de lanzamiento `80b3e3c`, 2026-10-06), con licencia MIT o Apache-2.0. La versión instalada ofrece exportación PDF nativa mediante `file.exportPdf`. Gutenberg conserva todo el catálogo MCP nativo y su vía de llamada, y añade catálogo de publicaciones, referencias de origen, espacio de páginas, sesiones de agente persistentes, instantáneas y deshacer, vistas previas y dos renderizadores de PDF.
 
 ## Funciones actuales
 
@@ -12,7 +12,8 @@ Esta primera versión es operativa, pero no afirma paridad con las suites de aut
 - Añadir marcos de texto, consultar y editar historias nativas, crear y aplicar páginas maestras y crear muestras de proceso CMYK desde el espacio de páginas. Para distribuir historias enlazadas, ajustar tipografía, estilos y composición avanzada, se puede continuar en DesignCraft.
 - Enlazar una publicación con su fuente mediante referencias `hoard://` y Hoard Hub. La fuente conserva su propietario y no se copia.
 - Renderizar vistas previas con DesignCraft.
-- Exportar un PDF multipágina auténtico a partir de imágenes renderizadas. Es **raster RGB**: el texto no se puede seleccionar ni buscar; no conserva trazados vectoriales, separaciones CMYK, tintas planas, sangrado ni conformidad PDF/X. Un límite de megapíxeles evita que documentos grandes agoten la memoria; para documentos largos se reduce la escala.
+- Exportar PDF multipágina nativo mediante `file.exportPdf` de DesignCraft. Gutenberg verifica el archivo y el número de páginas, devuelve las advertencias del motor y comprueba si el PDF real permite extraer algún texto. Esa comprobación no demuestra que todas las historias sean buscables: si falla la incrustación de fuentes, el motor puede convertir los glifos en contornos. La exportación nativa no afirma conformidad PDF/X ni PDF/UA.
+- Mantener la exportación PDF raster existente para compatibilidad e imágenes RGB previsibles. El texto raster no se puede seleccionar ni buscar; tampoco se conservan trazados vectoriales, separaciones CMYK, tintas planas, sangrado ni conformidad PDF/X. Un límite de megapíxeles evita que documentos grandes agoten la memoria; para documentos largos se reduce la escala.
 - Leer los perfiles de trabajo existentes de Hoard Hub. Seleccionar un perfil guarda el contexto de trabajo; no crea cuentas ni inicia o detiene perfiles.
 
 ## Instalación en Windows
@@ -39,7 +40,7 @@ El botón de escritorio abre el `.designcraft` seleccionado mediante el canal de
 
 El manifiesto de plugin está en [`faustus-plugin.json`](faustus-plugin.json). Inicia `python -m gutenberg_hoard.mcp_server` mediante stdio y configura `PYTHONPATH` para este repositorio y HoardLink. Define `FAUSTUS_PYTHON`, `GUTENBERG_DESIGNCRAFT_CLI` y `HOARDLINK_DIR` en el host.
 
-Las herramientas principales son `gutenberg_publications`, `gutenberg_create_publication`, `gutenberg_designcraft_catalog`, `gutenberg_designcraft_session`, `gutenberg_designcraft_raw_session`, `gutenberg_undo`, `gutenberg_export_pdf` y `gutenberg_link_source`. Las dos herramientas de sesión permiten despachar herramientas, prompts y recursos nativos sin un filtro de funciones. El catálogo devuelve los esquemas que anuncia el ejecutable instalado. Cada consumidor puede mantener una sesión estable; las ediciones de publicaciones se guardan y generan una instantánea.
+Las herramientas principales son `gutenberg_publications`, `gutenberg_create_publication`, `gutenberg_designcraft_catalog`, `gutenberg_designcraft_session`, `gutenberg_designcraft_raw_session`, `gutenberg_undo`, `gutenberg_export_pdf` y `gutenberg_link_source`. `gutenberg_export_pdf` acepta `renderer="native"` o `renderer="raster"`; raster sigue siendo el valor por defecto para las llamadas existentes y admite `scale`. La exportación nativa abre el documento registrado sin guardarlo ni modificarlo y devuelve la URL, el número de páginas, el resultado de extracción de texto y las advertencias del motor. Las dos herramientas de sesión permiten despachar herramientas, prompts y recursos nativos sin un filtro de funciones. El catálogo devuelve los esquemas que anuncia el ejecutable instalado. Cada consumidor puede mantener una sesión estable; las ediciones de publicaciones se guardan y generan una instantánea.
 
 La API se inicia con `python -m gutenberg_hoard`; la entrada MCP usa stdio y no abre un servidor web. Las rutas locales incluyen `/api/health`, `/api/publications`, `/api/native/catalog`, `/api/native/session` y `/api/profiles`.
 
@@ -59,7 +60,7 @@ $env:GUTENBERG_DESIGNCRAFT_CLI = 'D:\ruta\a\designcraft-cli.exe'
 pytest -q
 ```
 
-Las pruebas de integración usan sesiones MCP reales de DesignCraft, crean documentos aislados, los editan y deshacen, renderizan PNG auténticos y verifican cuántas páginas tiene el PDF exportado. No arrancan modelos ni acceden a servicios de red. Pytest guarda las pruebas y los artefactos temporales en sus propios directorios temporales.
+Las pruebas de integración usan sesiones MCP reales de DesignCraft, crean documentos aislados, los editan y deshacen, renderizan PNG auténticos y verifican las páginas del PDF raster. La exportación nativa se verifica por separado con el motor instalado, incluidas sus advertencias y el informe de extracción de texto. No arrancan modelos ni acceden a servicios de red. Pytest guarda las pruebas y los artefactos temporales en sus propios directorios temporales.
 
 ## Referencias upstream
 

@@ -57,7 +57,25 @@ class NativeSessions:
                 open_path: str | Path | None = None, save_path: str | Path | None = None,
                 inspect: bool = False) -> list[dict[str, Any]]:
         if session_id is None:
-            return asyncio.run(self._one_shot(actions))
+            loop = self._ensure_loop()
+            cleanup_complete = threading.Event()
+
+            async def one_shot() -> list[dict[str, Any]]:
+                try:
+                    return await self._one_shot(actions)
+                finally:
+                    cleanup_complete.set()
+
+            future = asyncio.run_coroutine_threadsafe(one_shot(), loop)
+            try:
+                return future.result(timeout=300)
+            except concurrent.futures.TimeoutError as exc:
+                if future.done():
+                    raise
+                future.cancel()
+                if not cleanup_complete.wait(timeout=15):
+                    raise TimeoutError("DesignCraft MCP one-shot timed out; engine cleanup is still pending") from exc
+                raise TimeoutError("DesignCraft MCP one-shot exceeded five minutes") from exc
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", session_id):
             raise ValueError("session_id must be 1–100 letters, digits, underscore, or hyphen")
         loop = self._ensure_loop()

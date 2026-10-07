@@ -2,7 +2,7 @@
 
 **A local publication desk for paginated editorial work.** Gutenberg manages publication files and their source links. DesignCraft owns the native page layout, stories, frames, parent pages, styles, swatches, history and rendering.
 
-This is an operational first release, not a claim of feature parity with desktop publishing suites. The verified upstream engine here is DesignCraft `0.2.1` (release commit `80b3e3c`, 2026-10-06), MIT or Apache-2.0. Its own README lists native `.designcraft`, IDML import/export and PNG export; native PDF is still on its roadmap. Gutenberg keeps the complete native MCP catalogue and dispatch path available while adding publication cataloguing, source references, a page workspace, persistent agent sessions, save snapshots/undo, a local preview workflow and a verified multipage PDF export.
+This is an operational first release, not a claim of feature parity with desktop publishing suites. The verified upstream engine here is DesignCraft `0.2.1` (release commit `80b3e3c`, 2026-10-06), MIT or Apache-2.0. The installed release exposes native PDF export through `file.exportPdf`. Gutenberg keeps the complete native MCP catalogue and dispatch path available while adding publication cataloguing, source references, a page workspace, persistent agent sessions, save snapshots/undo, a local preview workflow and two PDF export renderers.
 
 ## What works
 
@@ -12,7 +12,8 @@ This is an operational first release, not a claim of feature parity with desktop
 - Add editable text frames, read and edit native story text, create and apply parent pages, and create native CMYK process swatches from the page workspace. Continue in DesignCraft for threaded-story layout, typography, styles and advanced composition.
 - Link an editorial publication to a source record with a `hoard://` reference through Hoard Hub. This preserves source ownership and does not copy source files.
 - Render page previews with the native DesignCraft renderer.
-- Export an actual multipage PDF assembled from rendered page images. It is **RGB raster**: text cannot be selected/searched, and the PDF does not retain vector paths, CMYK separations, spot inks, bleed metadata or PDF/X conformance. A megapixel budget prevents large exports from exhausting memory; reduce render scale for long publications.
+- Export a native multipage PDF through DesignCraft `file.exportPdf`. Gutenberg verifies the produced file and page count, returns DesignCraft's export warnings, and checks whether the actual PDF yields any extractable text. That check does not prove every source story is searchable; font embedding can fall back to glyph outlines. The native export does not claim PDF/X or PDF/UA conformance.
+- Keep the existing raster PDF export for compatibility and predictable RGB page images. Raster text is not searchable and vector paths, CMYK separations, spot inks, bleed metadata and PDF/X conformance are not preserved. A megapixel budget prevents large exports from exhausting memory; reduce render scale for long publications.
 - Read existing named work profiles from Hoard Hub. Selecting one records a work context only; Gutenberg does not create accounts or start/stop the Hub profile.
 
 ## Setup on Windows
@@ -39,7 +40,7 @@ The desktop action opens the selected `.designcraft` file through the documented
 
 The plugin manifest is [`faustus-plugin.json`](faustus-plugin.json). It starts `python -m gutenberg_hoard.mcp_server` over stdio and points `PYTHONPATH` at both this checkout and the shared HoardLink checkout. Set `FAUSTUS_PYTHON`, `GUTENBERG_DESIGNCRAFT_CLI`, and `HOARDLINK_DIR` in the host's app configuration.
 
-The core Gutenberg tools are `gutenberg_publications`, `gutenberg_create_publication`, `gutenberg_designcraft_catalog`, `gutenberg_designcraft_session`, `gutenberg_designcraft_raw_session`, `gutenberg_undo`, `gutenberg_export_pdf`, and `gutenberg_link_source`. The two session tools expose generic native tool/resource/prompt dispatch without an allow-list. The catalog returns the schemas that the installed DesignCraft binary advertises. A caller can keep an independent session with a stable `session_id`; tracked publication edits are saved and snapshotted after each call.
+The core Gutenberg tools are `gutenberg_publications`, `gutenberg_create_publication`, `gutenberg_designcraft_catalog`, `gutenberg_designcraft_session`, `gutenberg_designcraft_raw_session`, `gutenberg_undo`, `gutenberg_export_pdf`, and `gutenberg_link_source`. `gutenberg_export_pdf` accepts `renderer="native"` or `renderer="raster"`; raster remains the default for existing callers and accepts `scale`. Native export opens the tracked source without saving or mutating it, then returns the artifact URL, page count, extractable-text check and engine warnings. The two session tools expose generic native tool/resource/prompt dispatch without an allow-list. The catalog returns the schemas that the installed DesignCraft binary advertises. A caller can keep an independent session with a stable `session_id`; tracked publication edits are saved and snapshotted after each call.
 
 Start the web API using `python -m gutenberg_hoard`; the MCP entrypoint uses stdio and has no web listener. Health and app routes are local: `/api/health`, `/api/publications`, `/api/native/catalog`, `/api/native/session`, and `/api/profiles`.
 
@@ -59,7 +60,7 @@ $env:GUTENBERG_DESIGNCRAFT_CLI = 'D:\path\to\designcraft-cli.exe'
 pytest -q
 ```
 
-The integration suite uses real DesignCraft MCP sessions, creates isolated native publications, edits and undoes them, renders real page PNGs and verifies the number of pages in the exported PDF. It does not start models or use network services. Test records and generated files go under pytest temporary directories.
+The integration suite uses real DesignCraft MCP sessions, creates isolated native publications, edits and undoes them, renders real page PNGs and verifies raster PDF page count. Native PDF export is separately verified against the installed engine, including its warnings and extractable text report. Tests do not start models or use network services. Test records and generated files go under pytest temporary directories.
 
 ## Upstream references
 

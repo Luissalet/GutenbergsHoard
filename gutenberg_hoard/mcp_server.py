@@ -1,6 +1,8 @@
 """MCP entrypoint: app tools plus complete discover/dispatch access to native DesignCraft MCP."""
 from __future__ import annotations
 
+from typing import Literal
+
 from mcp.server.fastmcp import FastMCP
 
 from . import native, publishing, store
@@ -39,9 +41,10 @@ def gutenberg_designcraft_session(publication_id: str, actions: list[dict], sess
 
 
 @mcp.tool()
-def gutenberg_export_pdf(publication_id: str, scale: float = 1.5) -> dict:
-    """Render all native pages and assemble a verified multipage RGB raster PDF."""
-    return publishing.export_pdf(publication_id, scale)
+def gutenberg_export_pdf(publication_id: str, scale: float = 1.5,
+                         renderer: Literal["native", "raster"] = "raster") -> dict:
+    """Export a native DesignCraft PDF or RGB raster PDF; scale applies to raster and raster is the default."""
+    return publishing.export_pdf(publication_id, scale, renderer)
 
 
 @mcp.tool()

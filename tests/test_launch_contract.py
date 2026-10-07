@@ -37,7 +37,14 @@ def test_hub_registry_resolves_launchable_app_with_own_icon():
     assert app.launch.env["GUTENBERG_PORT_STRICT"] == "1"
     assert app.token_file == str((ROOT / "data" / "mcp-token").resolve())
     assert app.agent_contract is True
-    assert Path(app.icon_path).name == "app-icon.svg"
+    icon = Path(app.icon_path)
+    assert icon.parent.resolve() == ROOT.resolve()
+    assert icon.name in {"app-icon.svg", "app-icon.png"}
+    icon_bytes = icon.read_bytes()
+    if icon.suffix.lower() == ".png":
+        assert icon_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+    else:
+        assert b"<svg" in icon_bytes[:1024]
 
 
 def test_shared_http_agent_contract_uses_same_gutenberg_handlers(monkeypatch, tmp_path):
@@ -76,6 +83,8 @@ def test_mcp_stdio_initializes_and_lists_tools_in_isolated_data(tmp_path):
                 assert {"gutenberg_publications", "gutenberg_designcraft_catalog",
                         "gutenberg_designcraft_session", "gutenberg_export_pdf",
                         "gutenberg_designcraft_cli"} <= names
+                export_tool = next(tool for tool in tools.tools if tool.name == "gutenberg_export_pdf")
+                assert {"native", "raster"} <= set(export_tool.inputSchema["properties"]["renderer"]["enum"])
                 result = await client.call_tool("gutenberg_publications", {})
                 assert not result.isError
                 payload = json.loads(result.content[0].text)
@@ -84,6 +93,26 @@ def test_mcp_stdio_initializes_and_lists_tools_in_isolated_data(tmp_path):
                 assert not catalog_result.isError
                 catalog = json.loads(catalog_result.content[0].text)
                 assert len(catalog["tools"]) >= 25 and len(catalog["commands"]) >= 25
+
+                async def call(name: str, arguments: dict) -> dict:
+                    response = await client.call_tool(name, arguments)
+                    assert not response.isError, response
+                    if response.structuredContent is not None:
+                        return response.structuredContent
+                    return json.loads(response.content[0].text)
+
+                publication = await call("gutenberg_create_publication", {
+                    "title": "Stdio native PDF regression", "pages": 2, "preset": "A4"})
+                publication_id = publication["id"]
+                await call("gutenberg_designcraft_session", {"publication_id": publication_id, "actions": [{
+                    "name": "execute", "arguments": {"command": "frame.create", "params": {
+                        "spread": 0, "rect": [54, 60, 540, 160], "content": "text",
+                        "text": "Native PDF created through the stdio tool."}}}]})
+                exported = await call("gutenberg_export_pdf", {
+                    "publication_id": publication_id, "renderer": "native"})
+                assert exported["renderer"] == "native" and exported["pages"] == 2
+                assert Path(exported["path"]).is_file()
+                assert isinstance(exported["warnings"], list)
         assert (data / "mcp-token").is_file()
 
     asyncio.run(verify())

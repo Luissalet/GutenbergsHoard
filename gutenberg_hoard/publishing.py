@@ -235,9 +235,70 @@ def _render_page_locked(publication_id: str, page: int, scale: float) -> dict:
             "bytes": output.stat().st_size}
 
 
-def export_pdf(publication_id: str, scale: float = 1.5) -> dict:
+def export_pdf(publication_id: str, scale: float = 1.5, renderer: str = "raster") -> dict:
     with _publication_lock(publication_id):
+        if renderer == "native":
+            return _export_native_pdf_locked(publication_id)
+        if renderer != "raster":
+            raise ValueError("renderer must be 'native' or 'raster'")
         return _export_pdf_locked(publication_id, scale)
+
+
+def _export_native_pdf_locked(publication_id: str) -> dict:
+    """Export from the open native document and report what the artifact proves."""
+    pub = store.get_publication(publication_id)
+    source_path = Path(pub["path"]).resolve()
+    if not source_path.is_file():
+        raise FileNotFoundError("Native DesignCraft document is missing")
+    output_path = store.publication_dir() / f"{source_path.stem}-native.pdf"
+    temp_path = output_path.with_name(f".{output_path.stem}-{uuid.uuid4().hex}.tmp.pdf")
+    action = [{"name": "execute", "arguments": {"command": "file.exportPdf", "params": {
+        "path": str(temp_path), "tagged": True}}}]
+    try:
+        results = native.run(action, session_id=publication_id, open_path=source_path)
+        _raise_native_errors(results)
+        payload = _text_result(results, "execute")
+        if not payload:
+            raise RuntimeError("DesignCraft native PDF export returned no artifact receipt")
+        reported_path = payload.get("path")
+        if reported_path and Path(str(reported_path)).resolve() != temp_path.resolve():
+            raise RuntimeError("DesignCraft native PDF export returned an unexpected output path")
+        if not temp_path.is_file() or temp_path.stat().st_size < 128:
+            raise RuntimeError("DesignCraft did not produce a native PDF")
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(str(temp_path))
+            page_count = len(reader.pages)
+            if page_count != pub["page_count"]:
+                raise RuntimeError(f"expected {pub['page_count']} pages, found {page_count}")
+            extracted_text = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+        except RuntimeError as exc:
+            raise RuntimeError(f"Native PDF verification failed: {exc}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Native PDF verification failed: {exc}") from exc
+        engine_warnings = payload.get("warnings") or []
+        if isinstance(engine_warnings, str):
+            engine_warnings = [engine_warnings]
+        if not isinstance(engine_warnings, list):
+            engine_warnings = [engine_warnings]
+        warnings = [json.dumps(warning, ensure_ascii=False) if isinstance(warning, dict) else str(warning)
+                    for warning in engine_warnings]
+        try:
+            os.replace(temp_path, output_path)
+        except PermissionError as exc:
+            raise RuntimeError(f"Native PDF export could not replace destination '{output_path}'; it may be open or locked: {exc}") from exc
+        byte_count = output_path.stat().st_size
+        _emit("publication.exported", {"publication_id": publication_id, "format": "pdf-native", "pages": page_count})
+        return {"path": str(output_path), "url": f"/api/files/{output_path.name}", "pages": page_count,
+                "renderer": "native", "kind": "native",
+                "searchable_text": bool(extracted_text),
+                "text_searchability": {"status": "text-extracted" if extracted_text else "no-text-extracted",
+                                       "extracted_characters": len(extracted_text),
+                                       "note": "This checks for extractable PDF text; it does not verify every source story."},
+                "warnings": warnings,
+                "bytes": byte_count, "engine_bytes": payload.get("bytes")}
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def _export_pdf_locked(publication_id: str, scale: float) -> dict:
@@ -281,7 +342,7 @@ def _export_pdf_locked(publication_id: str, scale: float) -> dict:
     os.replace(temp_pdf, pdf_path)
     _emit("publication.exported", {"publication_id": publication_id, "format": "pdf-raster", "pages": len(reader.pages)})
     return {"path": str(pdf_path), "url": f"/api/files/{pdf_path.name}", "pages": len(reader.pages),
-            "kind": "raster", "searchable_text": False, "colour_space": "RGB", "resolution_scale": scale,
+            "renderer": "raster", "kind": "raster", "searchable_text": False, "colour_space": "RGB", "resolution_scale": scale,
             "bytes": pdf_path.stat().st_size}
 
 

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -39,7 +39,8 @@ class RawSessionArgs(BaseModel):
 
 
 class PdfArgs(PublicationArgs):
-    scale: float = Field(default=1.5, ge=0.5, le=4)
+    scale: float = Field(default=1.5, ge=0.5, le=4, description="Raster render scale; ignored by the native renderer.")
+    renderer: Literal["native", "raster"] = "raster"
 
 
 class PageArgs(PublicationArgs):
@@ -112,8 +113,8 @@ TOOLS = [
          ann(), lambda _ctx, a: publishing.undo(a.publication_id)),
     Tool("gutenberg_render_page", "Render a native DesignCraft page preview PNG.", PageArgs,
          ann(read_only=True), lambda _ctx, a: publishing.render_page(a.publication_id, a.page, a.scale)),
-    Tool("gutenberg_export_pdf", "Export and verify a multipage RGB raster PDF from native page renders.", PdfArgs,
-         ann(), lambda _ctx, a: publishing.export_pdf(a.publication_id, a.scale)),
+    Tool("gutenberg_export_pdf", "Export a publication as a native DesignCraft PDF or an RGB raster PDF.", PdfArgs,
+         ann(), lambda _ctx, a: publishing.export_pdf(a.publication_id, a.scale, a.renderer)),
     Tool("gutenberg_link_source", "Connect a publication to an owned source record through HoardLink.", LinkArgs,
          ann(idempotent=True), lambda _ctx, a: _link(a)),
 ]
@@ -121,7 +122,10 @@ TOOLS = [
 
 INSTRUCTIONS = ("Gutenberg owns the publication catalog and source links; DesignCraft owns native page layout. "
                 "Use gutenberg_designcraft_catalog to discover current engine schemas. Its session tool forwards "
-                "the entire native surface. Preserve .designcraft as the editable source. PDF export is RGB raster.")
+                "the entire native surface. Preserve .designcraft as the editable source. "
+                "gutenberg_export_pdf accepts renderer='native' or 'raster'; raster remains the default and accepts scale. "
+                "Native receipts report engine warnings and whether any PDF text was extractable; this does not prove "
+                "that every story is searchable or establish PDF/X or PDF/UA conformance.")
 
 router = make_agent_router(
     tools_fn=lambda: agentkit.tool_catalog(TOOLS),

@@ -235,16 +235,37 @@ $('#undo-edit').onclick = async () => {
 async function exportPdf() {
   if (!current) return;
   const b = $('#export-pdf');
+  const result = $('#pdf-export-result');
+  const renderer = $('#pdf-renderer').value;
+  result.hidden = true;
   b.disabled = true;
-  b.textContent = 'Rendering pages…';
+  b.textContent = renderer === 'native' ? 'Exporting native PDF…' : 'Rendering raster pages…';
   try {
-    const d = await request(`/api/publications/${current.id}/export/pdf`, { method: 'POST', body: JSON.stringify({ scale: Number($('#pdf-scale').value) }) });
-    toast(`Verified ${d.pages}-page raster PDF · RGB · non-searchable text`);
+    const d = await request(`/api/publications/${current.id}/export/pdf`, { method: 'POST', body: JSON.stringify({
+      renderer, scale: Number($('#pdf-scale').value)
+    }) });
+    const warnings = Array.isArray(d.warnings) ? d.warnings : [];
+    const searchability = d.renderer === 'native'
+      ? (d.searchable_text ? `${d.text_searchability.extracted_characters} extractable text characters detected` : 'No extractable text detected')
+      : 'Text is not searchable in raster output';
+    result.innerHTML = `<b>${escapeHtml(String(d.pages))}-page ${escapeHtml(d.renderer)} PDF · ${escapeHtml(searchability)}</b>` +
+      `<div><a href="${escapeHtml(d.url)}" target="_blank" rel="noopener">Open exported PDF</a></div>` +
+      (warnings.length ? `<div>DesignCraft warnings: ${warnings.map(escapeHtml).join(' · ')}</div>` :
+        (d.renderer === 'native' ? '<div>DesignCraft returned no export warnings.</div>' : ''));
+    result.hidden = false;
+    toast(`Exported ${d.pages}-page ${d.renderer} PDF.`);
     window.open(d.url, '_blank', 'noopener');
-  } catch (e) { toast(e.message); }
-  finally { b.disabled = false; b.textContent = 'Export multipage PDF'; }
+  } catch (e) { result.textContent = e.message; result.hidden = false; toast(e.message); }
+  finally { b.disabled = false; syncPdfRenderer(); }
 }
 $('#export-pdf').onclick = exportPdf;
+function syncPdfRenderer() {
+  const native = $('#pdf-renderer').value === 'native';
+  $('#pdf-scale').disabled = native;
+  $('#export-pdf').textContent = native ? 'Export native PDF' : 'Export raster PDF';
+}
+$('#pdf-renderer').onchange = syncPdfRenderer;
+syncPdfRenderer();
 
 async function launchNative() {
   if (!current) return toast('Select a publication before opening DesignCraft.');
@@ -287,7 +308,7 @@ $('#run-cli').onclick = async () => {
 async function loadSettings() {
   try {
     const [c, p] = await Promise.all([request('/api/config'), request('/api/profiles')]);
-    $('#settings-card').innerHTML = `<div class="settings-row"><span>DesignCraft CLI</span><code>${escapeHtml(c.designcraft_cli || 'Not configured')}</code></div><div class="settings-row"><span>Desktop editor</span><code>${escapeHtml(c.designcraft_gui || 'Not found next to CLI')}</code></div><div class="settings-row"><span>Application data</span><code>${escapeHtml(c.data_dir)}</code></div><div class="settings-row"><span>Native source</span><code>.designcraft · original document retained</code></div><div class="settings-row"><span>PDF profile</span><code>Multipage RGB raster · text not searchable · no PDF/X</code></div>`;
+    $('#settings-card').innerHTML = `<div class="settings-row"><span>DesignCraft CLI</span><code>${escapeHtml(c.designcraft_cli || 'Not configured')}</code></div><div class="settings-row"><span>Desktop editor</span><code>${escapeHtml(c.designcraft_gui || 'Not found next to CLI')}</code></div><div class="settings-row"><span>Application data</span><code>${escapeHtml(c.data_dir)}</code></div><div class="settings-row"><span>Native source</span><code>.designcraft · original document retained</code></div><div class="settings-row"><span>PDF export</span><code>Native DesignCraft or RGB raster · artifact reports warnings · no PDF/X claim</code></div>`;
     const select = $('#hub-profile');
     select.innerHTML = '<option value="">No profile selected</option>' + p.profiles.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
     select.value = p.selected || '';

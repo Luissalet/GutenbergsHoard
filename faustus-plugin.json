@@ -10,6 +10,7 @@
     "native-designcraft-mcp-dispatch",
     "persistent-designcraft-sessions",
     "editorial-page-preview",
+    "multipage-native-pdf",
     "multipage-raster-pdf",
     "hoard-source-references",
     "hub-work-profiles"
@@ -52,5 +53,5 @@
     },
     "optional_env": ["HOARD_HUB_URL"]
   },
-  "notes": "HoardLink is installed editable into the dedicated .venv. DesignCraft is configured in ignored local-config.json and remains a separate upstream executable. PDF output is verified multipage RGB raster with non-searchable text; this plugin does not claim native vector PDF or PDF/X. MCP session and native document history is owned by the DesignCraft process while active; Gutenberg snapshots allow undo after restart."
+  "notes": "HoardLink is installed editable into the dedicated .venv. DesignCraft is configured in ignored local-config.json and remains a separate upstream executable. Native PDF export uses DesignCraft file.exportPdf, verifies the artifact and page count, returns engine warnings, and checks text extraction on the exported file. Raster PDF remains available with its existing scale control and RGB page images. Neither path claims PDF/X or PDF/UA conformance. MCP session and native document history is owned by the DesignCraft process while active; Gutenberg snapshots allow undo after restart."
 }

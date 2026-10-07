@@ -9,6 +9,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -107,7 +108,8 @@ class NativeCalls(BaseModel):
 
 
 class PdfExport(BaseModel):
-    scale: float = Field(default=1.5, ge=0.5, le=4)
+    scale: float = Field(default=1.5, ge=0.5, le=4, description="Raster render scale; ignored by the native renderer.")
+    renderer: Literal["native", "raster"] = "raster"
 
 
 class ProfileSelection(BaseModel):
@@ -156,8 +158,11 @@ def get_config() -> dict:
     return {"app": "gutenberg", "data_dir": str(app_paths.data_dir), "data_configured": app_paths.configured,
             "designcraft_cli": str(designcraft_cli()) if designcraft_cli() else None,
             "designcraft_gui": str(designcraft_gui()) if designcraft_gui() else None,
-            "native_format": ".designcraft", "pdf_export": {"available": True, "kind": "multipage raster",
-            "searchable_text": False, "colour_space": "RGB", "pdf_x": False}}
+            "native_format": ".designcraft", "pdf_export": {"available": True,
+            "renderers": ["native", "raster"], "default_renderer": "raster",
+            "raster": {"kind": "multipage raster", "searchable_text": False, "colour_space": "RGB"},
+            "native": {"kind": "DesignCraft native PDF", "searchability": "checked on each exported artifact",
+                       "warnings": "returned by DesignCraft"}, "pdf_x": False}}
 
 
 @app.get("/api/profiles")
@@ -273,7 +278,7 @@ def preview(publication_id: str, page: int, scale: float = 1) -> FileResponse:
 
 @app.post("/api/publications/{publication_id}/export/pdf")
 def export_pdf(publication_id: str, payload: PdfExport) -> dict:
-    return _run(lambda: publishing.export_pdf(publication_id, payload.scale))
+    return _run(lambda: publishing.export_pdf(publication_id, payload.scale, payload.renderer))
 
 
 @app.get("/api/files/{filename}")
