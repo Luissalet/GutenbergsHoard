@@ -32,11 +32,28 @@ def _edit_lock(publication_id: str) -> threading.RLock:
         return _edit_locks.setdefault(publication_id, threading.RLock())
 
 
+_held = threading.local()
+
+
+class StoryConflict(Exception):
+    """The story text changed since the caller loaded it."""
+
+
 @contextmanager
 def _publication_lock(publication_id: str):
+    held = getattr(_held, "ids", None)
+    if held is None:
+        held = _held.ids = set()
+    if publication_id in held:  # re-entrant for compound operations on one thread
+        yield
+        return
     with _edit_lock(publication_id):
         with store.publication_lock(publication_id):
-            yield
+            held.add(publication_id)
+            try:
+                yield
+            finally:
+                held.discard(publication_id)
 
 
 def _text_result(action: dict, name: str) -> dict:
@@ -111,6 +128,17 @@ def get_story(publication_id: str, story_id: int) -> dict:
                              session_id=publication_id, open_path=pub["path"])
         _raise_native_errors(results)
         return _text_result(results, "get_story")
+
+
+def set_story_text(publication_id: str, story_id: int, text: str, base_text: str | None = None) -> dict:
+    """Replace one story's text atomically; with base_text, refuse if the story changed meanwhile."""
+    with _publication_lock(publication_id):
+        if base_text is not None:
+            current = get_story(publication_id, story_id).get("text", "")
+            if current != base_text:
+                raise StoryConflict("This story was changed after you opened it. Reload it before saving.")
+        return native_actions(publication_id, [{"name": "set_story_text", "arguments": {
+            "story": story_id, "text": text}}])
 
 
 def native_actions(publication_id: str, actions: list[dict], session_id: str | None = None) -> dict:

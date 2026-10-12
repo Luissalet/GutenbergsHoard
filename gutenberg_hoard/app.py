@@ -116,6 +116,11 @@ class ProfileSelection(BaseModel):
     name: str = Field(max_length=120)
 
 
+class StoryText(BaseModel):
+    text: str = Field(max_length=2_000_000)
+    base_text: str | None = Field(default=None, max_length=2_000_000)
+
+
 class ParentAssignment(BaseModel):
     page: int = Field(ge=0)
     parent: str | None = Field(default=None, max_length=40)
@@ -223,6 +228,11 @@ def story(publication_id: str, story_id: int) -> dict:
     return _run(lambda: publishing.get_story(publication_id, story_id))
 
 
+@app.post("/api/publications/{publication_id}/stories/{story_id}/text")
+def save_story_text(publication_id: str, story_id: int, payload: StoryText) -> dict:
+    return _run(lambda: publishing.set_story_text(publication_id, story_id, payload.text, payload.base_text))
+
+
 @app.post("/api/publications/{publication_id}/parent")
 def assign_parent(publication_id: str, payload: ParentAssignment) -> dict:
     return _run(lambda: publishing.native_actions(publication_id, [{"name": "execute", "arguments": {
@@ -310,6 +320,8 @@ def launch_native(publication_id: str) -> dict:
 def _run(fn):
     try:
         return fn()
+    except publishing.StoryConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
     except FileNotFoundError as exc:

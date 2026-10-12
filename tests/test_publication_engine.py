@@ -98,6 +98,16 @@ def test_native_story_parent_and_cmyk_workflow_are_editable():
     assert publishing.get_story(pub["id"], story_id)["text"] == "Original story words"
 
 
+def test_set_story_text_is_compare_and_set_on_the_real_document():
+    pub = create_two_pages()
+    story_id = add_text(pub["id"], "Original story words")["inspection"]["stories"][0]["id"]
+    publishing.set_story_text(pub["id"], story_id, "Revised", base_text="Original story words")
+    assert publishing.get_story(pub["id"], story_id)["text"] == "Revised"
+    with pytest.raises(publishing.StoryConflict):
+        publishing.set_story_text(pub["id"], story_id, "Stale", base_text="Original story words")
+    assert publishing.get_story(pub["id"], story_id)["text"] == "Revised"
+
+
 def test_installed_cli_verbs_dispatch_without_a_shell():
     help_doc = native.cli_help()
     commands = {item["command"] for item in help_doc["commands"]}
