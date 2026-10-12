@@ -6,6 +6,10 @@ let inspection = null;
 let page = 0;
 let storyId = null;
 let catalog = null;
+let currentView = 'workspace';
+let storyBase = '';
+let parentBase = '';
+let parentPage = -1;
 
 function toast(message) {
   const el = $('#toast');
@@ -27,6 +31,7 @@ function escapeHtml(s) {
 }
 
 function showView(view) {
+  currentView = view;
   $$('.view').forEach(x => x.classList.toggle('active', x.id === `view-${view}`));
   $$('.nav').forEach(x => {
     const active = x.dataset.view === view;
@@ -58,7 +63,10 @@ function renderPublications() {
 }
 
 async function selectPublication(id) {
-  try { current = await request(`/api/publications/${id}`); page = 0; showView('pages'); }
+  try {
+    current = await request(`/api/publications/${id}`); page = 0; storyId = null; storyBase = ''; parentPage = -1;
+    showView('pages');
+  }
   catch (e) { toast(e.message); }
 }
 
@@ -89,19 +97,27 @@ function parentPrefix(label) {
   return match ? match[1] : String(label || '');
 }
 
-async function loadStory(id) {
+// keepDirty: reload the story from the document but leave what the person typed in the box.
+async function loadStory(id, keepDirty = false) {
+  const previous = storyId;
   storyId = id ? Number(id) : null;
   $('#save-story').disabled = !storyId;
-  if (!storyId) { $('#story-text').value = ''; $('#story-meta').textContent = 'No stories in this document.'; return; }
+  if (!storyId) { storyBase = ''; $('#story-text').value = ''; $('#story-meta').textContent = 'No stories in this document.'; return; }
   try {
     const story = await request(`/api/publications/${current.id}/stories/${storyId}`);
-    $('#story-text').value = story.text || '';
-    $('#story-meta').textContent = `${story.frames?.length || 0} linked frame(s) · ${story.paragraphs || 0} paragraph(s)${story.overset ? ' · overset text' : ''}`;
+    const draftKept = keepDirty && previous === storyId && $('#story-text').value !== storyBase;
+    if (!draftKept) { storyBase = story.text || ''; $('#story-text').value = storyBase; }
+    else if ((story.text || '') === $('#story-text').value) storyBase = story.text || '';
+    // A kept draft whose base moved on in the document: saving is refused (409) until it is reloaded.
+    const moved = draftKept && (story.text || '') !== storyBase && (story.text || '') !== $('#story-text').value;
+    $('#story-meta').textContent = `${story.frames?.length || 0} linked frame(s) · ${story.paragraphs || 0} paragraph(s)${story.overset ? ' · overset text' : ''}${moved ? ' · this story changed in the document while you were editing; reselect it to reload' : ''}`;
   } catch (e) { $('#story-meta').textContent = e.message; toast(e.message); }
 }
 
-async function renderPages() {
+// quiet: refresh from the document in place (no placeholder, forms keep what was typed).
+async function renderPages(quiet = false) {
   if (!current) return;
+  if (page >= current.page_count) page = Math.max(0, current.page_count - 1);
   $('#editor-title').textContent = current.title;
   $('#editor-subtitle').textContent = `${current.page_count} pages · ${current.profile.preset || 'A4'} · ${current.profile.requested_colour_space || 'RGB'} · editable DesignCraft source`;
   $('#page-total').textContent = current.page_count;
@@ -114,7 +130,7 @@ async function renderPages() {
   $('#page-list').innerHTML = Array.from({ length: current.page_count }, (_, i) => `<button class="page-thumb ${page === i ? 'active' : ''}" data-page="${i}"><div class="mini-page"><span>${i + 1}</span></div><span>Page ${String(i + 1).padStart(2, '0')}</span></button>`).join('');
   $$('.page-thumb').forEach(b => b.onclick = () => { page = Number(b.dataset.page); renderPages(); });
   $('#page-label').textContent = `Page ${page + 1} of ${current.page_count}`;
-  $('#canvas').innerHTML = '<div class="preview-empty">Rendering native page…</div>';
+  if (!quiet) $('#canvas').innerHTML = '<div class="preview-empty">Rendering native page…</div>';
   try {
     const res = await fetch(`/api/publications/${current.id}/pages/${page}/preview?scale=1.2`);
     if (!res.ok) { const j = await res.json(); throw Error(j.detail); }
@@ -122,14 +138,14 @@ async function renderPages() {
     const img = $(`#page-list [data-page="${page}"] .mini-page`);
     img.innerHTML = `<img alt="Page ${page + 1}" src="/api/publications/${current.id}/pages/${page}/preview?scale=.35">`;
     inspection = await request(`/api/publications/${current.id}/inspection`);
-    renderStructure(inspection);
+    renderStructure(inspection, quiet);
   } catch (e) {
     $('#canvas').innerHTML = `<div class="preview-empty">${escapeHtml(e.message)}</div>`;
     toast(e.message);
   }
 }
 
-function renderStructure(data) {
+function renderStructure(data, keepDirty = false) {
   const stories = data.stories || [];
   $('#story-select').innerHTML = stories.length
     ? stories.map(s => `<option value="${s.id}">Story ${s.id} · ${s.frames?.length || 0} frame(s)${s.overset ? ' · overset' : ''}</option>`).join('')
@@ -138,9 +154,10 @@ function renderStructure(data) {
   if (stories.length) {
     const selected = stories.some(s => String(s.id) === String(storyId)) ? String(storyId) : String(stories[0].id);
     $('#story-select').value = selected;
-    loadStory(selected);
+    loadStory(selected, true);
   } else loadStory(null);
   const parents = data.parents || [];
+  const parentDraft = keepDirty && parentPage === page && $('#parent-select').value !== parentBase ? $('#parent-select').value : null;
   const options = parents.map(p => `<option value="${escapeHtml(parentPrefix(p.label))}">${escapeHtml(p.label)} · ${p.items} item(s)</option>`).join('');
   $('#parent-select').innerHTML = '<option value="">No parent page</option>' + options;
   $('#apply-parent').disabled = false;
@@ -149,6 +166,9 @@ function renderStructure(data) {
   const pageInfo = spread?.pages?.[0];
   if (pageInfo?.parent && parentPrefix(pageInfo.parent)) $('#parent-select').value = parentPrefix(pageInfo.parent);
   else $('#parent-select').value = '';
+  parentBase = $('#parent-select').value;
+  parentPage = page;
+  if (parentDraft !== null && [...$('#parent-select').options].some(o => o.value === parentDraft)) $('#parent-select').value = parentDraft;
   const swatches = data.swatches || [];
   $('#swatch-list').innerHTML = swatches.slice(-8).map(name => `<span class="swatch-chip">${escapeHtml(name)}</span>`).join('');
 }
@@ -156,9 +176,12 @@ function renderStructure(data) {
 $('#story-select').onchange = () => loadStory($('#story-select').value);
 $('#save-story').onclick = async () => {
   if (!current || !storyId) return;
+  // Partial save: only a changed story is sent, and the server refuses it if the document's copy moved on.
+  const changes = globalThis.gutenbergCopilotContext.changedFields({ text: storyBase }, { text: $('#story-text').value });
+  if (!('text' in changes)) return toast('No changes to save.');
   $('#save-story').disabled = true;
   try {
-    const data = await request(`/api/publications/${current.id}/native-actions`, { method: 'POST', body: JSON.stringify({ actions: [{ name: 'set_story_text', arguments: { story: storyId, text: $('#story-text').value } }] }) });
+    const data = await request(`/api/publications/${current.id}/stories/${storyId}/text`, { method: 'POST', body: JSON.stringify({ text: changes.text, base_text: storyBase }) });
     current = data.publication;
     await refresh();
     await renderPages();
@@ -327,6 +350,73 @@ async function health() {
     $('#engine-state').textContent = d.configured ? 'DesignCraft connected' : 'DesignCraft needs setup';
     $('#engine-state').classList.toggle('ready', d.configured);
   } catch { $('#engine-state').textContent = 'Local service'; }
+}
+
+// --- Family assistant contract: real context of the open view, form snapshots, in-place refresh ---
+const CREATE_DEFAULTS = { title: '', pages: 8, preset: 'A4', margins: 36, colour_space: 'RGB', facing_pages: false };
+const SWATCH_DEFAULTS = { name: 'Print Ink', c: 100, m: 0, y: 0, k: 0 };
+
+function formSnapshot(kind, objectId, base, draft) {
+  const CC = globalThis.gutenbergCopilotContext;
+  const changed = CC.changedFields(base, draft);
+  return { kind, object_id: objectId, dirty: Object.keys(changed).length > 0, fields: CC.previewFields(changed) };
+}
+
+function copilotSnapshots() {
+  const out = [];
+  if ($('#new-dialog').open) {
+    const f = new FormData($('#create-form'));
+    const v = Object.fromEntries(f);
+    out.push(formSnapshot('publication_create', null, CREATE_DEFAULTS, {
+      title: v.title ?? '', pages: Number(v.pages ?? 8), preset: v.preset ?? 'A4', margins: Number(v.margins ?? 36),
+      colour_space: v.colour_space ?? 'RGB', facing_pages: f.has('facing_pages') }));
+  }
+  if (currentView === 'pages' && current) {
+    if (storyId) out.push(formSnapshot('story_edit', `${current.id}:${storyId}`, { text: storyBase }, { text: $('#story-text').value }));
+    out.push(formSnapshot('page_parent', `${current.id}:${page}`, { parent: parentBase }, { parent: $('#parent-select').value }));
+    out.push(formSnapshot('frame_create', null, { text: '' }, { text: $('#frame-text').value }));
+    out.push(formSnapshot('swatch_create', null, SWATCH_DEFAULTS, {
+      name: $('#swatch-name').value, c: Number($('#ink-c').value), m: Number($('#ink-m').value),
+      y: Number($('#ink-y').value), k: Number($('#ink-k').value) }));
+    out.push(formSnapshot('source_link', null, { source: '' }, { source: $('#source-ref').value }));
+  }
+  return out;
+}
+
+async function copilotContext() {
+  const CC = globalThis.gutenbergCopilotContext;
+  try {
+    const forms = CC.editorContext(window);
+    let pub = null, insp = null, story = null;
+    if (current && currentView === 'pages') {
+      try { pub = await request(`/api/publications/${current.id}`); } catch { pub = null; }
+      if (pub) {
+        try { insp = await request(`/api/publications/${pub.id}/inspection`); } catch { insp = inspection; }
+        if (storyId) { try { story = await request(`/api/publications/${pub.id}/stories/${storyId}`); } catch { story = null; } }
+      }
+    }
+    return CC.buildContext({ page: currentView, publication: pub, pageIndex: page, inspection: insp, storyId, story, forms });
+  } catch { return { active_objects: [], view: { page: 'workspace' } }; }
+}
+
+async function refreshInPlace() {
+  try {
+    await refresh();
+    if (!current) return;
+    const id = current.id;
+    let fresh;
+    try { fresh = await request(`/api/publications/${id}`); } catch { return; }
+    if (!current || current.id !== id) return;
+    current = fresh;
+    if (currentView === 'pages') await renderPages(true);
+  } catch { /* keep the current view; the next turn refreshes again */ }
+}
+
+if (typeof window !== 'undefined' && globalThis.gutenbergCopilotContext && !window.hoardCopilot) {
+  window.addEventListener('gutenberg:context-request', e => { for (const s of copilotSnapshots()) e.detail.provide(s); });
+  const scheduleRefresh = globalThis.gutenbergCopilotContext.debounced(refreshInPlace, 250);
+  window.addEventListener('hoard:copilot-turn-end', scheduleRefresh);
+  window.hoardCopilot = { context: copilotContext, onTurnEnd: scheduleRefresh };
 }
 
 $$('.text-button[data-view]').forEach(el => el.onclick = () => showView(el.dataset.view));
