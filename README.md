@@ -36,6 +36,18 @@ The Hub launches the app on loopback port `5218` in strict mode and starts stdio
 
 The desktop action opens the selected `.designcraft` file through the documented DesignCraft control channel: the GUI is started as `designcraft.exe --control <port>`, then the verified CLI invokes `file.open {path}`. The control port is loopback-only and selected from an unused local port.
 
+## Faustus assistant
+
+Once the shared Hoard Link launcher is installed, the app shows the family's Faustus panel (a floating button). The conversation, the model and the tools live in Faustus; this app only tells the panel what is open.
+
+- **Context per view.** An open publication is sent as kind `publication` with its real id (also as the panel's external project), title, page count, preset, colour space, facing pages, margins, file path, update time and whether undo is available. In the pages view it adds the open `page` (id `<publication>:<index>`, parent) and available `story` objects (id `<publication>:<story>`, frames, overset, selected), including selections beyond the first thirty stories. Only the selected saved story carries a 300-character preview; native tools retrieve its full saved text. The view, ids and pending forms are captured together before native resolution; navigation during that request affects the next context. Views without an open publication give no active object.
+- **Unsaved fields.** The panel asks for them with the `gutenberg:context-request` window event. The forms `publication_create` (no id yet), `story_edit`, `page_parent`, `frame_create`, `swatch_create` and `source_link` answer with only the fields that changed, preserving their complete pending values. Unsaved text is available to the assistant even when the change is at the end of a long draft.
+- **Refresh.** When the assistant finishes a turn the open view reloads from the document in place (`hoard:copilot-turn-end` / `window.hoardCopilot.onTurnEnd`, merged into one reload); forms keep what was typed.
+- **Saving.** Saving a story sends the changed text with the text it was loaded from to the new `POST /api/publications/{id}/stories/{story}/text` (`text`, `base_text`). It is an atomic compare-and-set under the publication lock: if the story changed meanwhile it answers 409 (`StoryConflict`) and nothing is written until you reload. Without `base_text` the text is replaced.
+- **Tests.** `node --test tests/copilot-context.test.mjs` and `python -m pytest tests/test_copilot_ui.py tests/test_story_save.py tests/test_publication_engine.py`.
+
+The opt-in `tests/browser_copilot_context.py` regression accepts `--cli`, `--sdk` and `--output-dir` paths, with optional `--playwright-sitepackages`. It uses private data, headless native MCP, a real browser and the shared SDK with a scripted provider to verify long drafts, the selected thirty-first story, navigation during context resolution and a native tool turn with the same editor/draft retained. See [the API and copilot contract](docs/copilot.md).
+
 ## MCP
 
 The plugin manifest is [`faustus-plugin.json`](faustus-plugin.json). It starts `python -m gutenberg_hoard.mcp_server` over stdio and points `PYTHONPATH` at both this checkout and the shared HoardLink checkout. Set `FAUSTUS_PYTHON`, `GUTENBERG_DESIGNCRAFT_CLI`, and `HOARDLINK_DIR` in the host's app configuration.

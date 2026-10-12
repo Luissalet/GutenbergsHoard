@@ -36,6 +36,18 @@ Hub inicia la app en loopback, puerto estricto `5218`, y ejecuta MCP stdio con e
 
 El botón de escritorio abre el `.designcraft` seleccionado mediante el canal de control documentado por DesignCraft: ejecuta `designcraft.exe --control <puerto>` y luego la CLI verificada llama a `file.open {path}`. El canal solo escucha en loopback y usa un puerto local disponible.
 
+## Asistente de Faustus
+
+Con el lanzador compartido de Hoard Link instalado, la app muestra el panel de Faustus de la familia (un botón flotante). La conversación, el modelo y las herramientas viven en Faustus; esta app solo le dice al panel qué hay abierto.
+
+- **Contexto por vista.** Una publicación abierta se envía como `publication` con su id real (también como proyecto externo del panel), título, número de páginas, preajuste, espacio de color, páginas enfrentadas, márgenes, ruta del archivo, hora de actualización y si se puede deshacer. En la vista de páginas añade la `page` abierta (id `<publicación>:<índice>`, maqueta madre) y los objetos `story` disponibles (id `<publicación>:<historia>`, marcos, desbordada, seleccionada), incluidas las selecciones posteriores a las primeras treinta historias. Solo la historia guardada seleccionada lleva una vista previa de 300 caracteres; las tools nativas recuperan su texto guardado completo. La vista, los ids y los formularios pendientes se capturan juntos antes de resolver los objetos; cambiar de vista mientras espera afecta al siguiente contexto. Las vistas sin publicación abierta no dan objeto activo.
+- **Campos sin guardar.** El panel los pide con el evento de ventana `gutenberg:context-request`. Los formularios `publication_create` (aún sin id), `story_edit`, `page_parent`, `frame_create`, `swatch_create` y `source_link` responden solo con los campos que han cambiado, conservando sus valores pendientes completos. El asistente recibe también los cambios al final de un borrador largo.
+- **Refresco.** Cuando el asistente termina un turno, la vista abierta se recarga desde el documento en el sitio (`hoard:copilot-turn-end` / `window.hoardCopilot.onTurnEnd`, unidos en una sola recarga); los formularios conservan lo escrito.
+- **Guardado.** Guardar una historia envía el texto cambiado junto con el texto con el que se cargó al nuevo `POST /api/publications/{id}/stories/{story}/text` (`text`, `base_text`). Es un compare-and-set atómico bajo el bloqueo de la publicación: si la historia cambió entretanto responde 409 (`StoryConflict`) y no se escribe nada hasta que recargues. Sin `base_text` el texto se reemplaza.
+- **Pruebas.** `node --test tests/copilot-context.test.mjs` y `python -m pytest tests/test_copilot_ui.py tests/test_story_save.py tests/test_publication_engine.py`.
+
+La regresión opcional `tests/browser_copilot_context.py` acepta rutas `--cli`, `--sdk` y `--output-dir`, más `--playwright-sitepackages` si hace falta. Usa datos privados, MCP nativo sin ventana, navegador real y el SDK común con proveedor simulado para comprobar borradores largos, la historia31 seleccionada, navegación durante la resolución y un turno con tool nativa que conserva el editor y el borrador. Véase [el contrato API y copilot](docs/copilot.md).
+
 ## MCP
 
 El manifiesto de plugin está en [`faustus-plugin.json`](faustus-plugin.json). Inicia `python -m gutenberg_hoard.mcp_server` mediante stdio y configura `PYTHONPATH` para este repositorio y HoardLink. Define `FAUSTUS_PYTHON`, `GUTENBERG_DESIGNCRAFT_CLI` y `HOARDLINK_DIR` en el host.

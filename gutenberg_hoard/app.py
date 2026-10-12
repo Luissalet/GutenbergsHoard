@@ -37,6 +37,8 @@ app = FastAPI(title="Gutenberg's Hoard", version="0.1.0", lifespan=lifespan)
 from hoard_link.guard import install_guard
 from .config import port as configured_port
 install_guard(app,port_getter=configured_port,allowed_env='GUTENBERG_ALLOWED_HOSTS')
+from hoard_link.copilot import install_copilot
+install_copilot(app, "gutenberg", str(paths().data_dir), app_name="Gutenberg's Hoard")
 app.mount("/static/hoard-link", StaticFiles(directory=Path(hoard_link.__file__).parent / "ui"), name="hoard-link-ui")
 app.mount("/static", StaticFiles(directory=ROOT / "gutenberg_hoard" / "static"), name="static")
 from .agent_tools import router as agent_router
@@ -114,6 +116,11 @@ class PdfExport(BaseModel):
 
 class ProfileSelection(BaseModel):
     name: str = Field(max_length=120)
+
+
+class StoryText(BaseModel):
+    text: str = Field(max_length=2_000_000)
+    base_text: str | None = Field(default=None, max_length=2_000_000)
 
 
 class ParentAssignment(BaseModel):
@@ -223,6 +230,11 @@ def story(publication_id: str, story_id: int) -> dict:
     return _run(lambda: publishing.get_story(publication_id, story_id))
 
 
+@app.post("/api/publications/{publication_id}/stories/{story_id}/text")
+def save_story_text(publication_id: str, story_id: int, payload: StoryText) -> dict:
+    return _run(lambda: publishing.set_story_text(publication_id, story_id, payload.text, payload.base_text))
+
+
 @app.post("/api/publications/{publication_id}/parent")
 def assign_parent(publication_id: str, payload: ParentAssignment) -> dict:
     return _run(lambda: publishing.native_actions(publication_id, [{"name": "execute", "arguments": {
@@ -310,6 +322,8 @@ def launch_native(publication_id: str) -> dict:
 def _run(fn):
     try:
         return fn()
+    except publishing.StoryConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
     except FileNotFoundError as exc:
