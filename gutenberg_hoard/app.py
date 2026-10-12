@@ -37,6 +37,8 @@ app = FastAPI(title="Gutenberg's Hoard", version="0.1.0", lifespan=lifespan)
 from hoard_link.guard import install_guard
 from .config import port as configured_port
 install_guard(app,port_getter=configured_port,allowed_env='GUTENBERG_ALLOWED_HOSTS')
+from hoard_link.copilot import install_copilot
+install_copilot(app, "gutenberg", str(paths().data_dir), app_name="Gutenberg's Hoard")
 app.mount("/static/hoard-link", StaticFiles(directory=Path(hoard_link.__file__).parent / "ui"), name="hoard-link-ui")
 app.mount("/static", StaticFiles(directory=ROOT / "gutenberg_hoard" / "static"), name="static")
 from .agent_tools import router as agent_router
