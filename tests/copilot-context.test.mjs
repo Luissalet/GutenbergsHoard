@@ -7,12 +7,13 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const CC = require('../gutenberg_hoard/static/copilot-context.js');
 
-test('changedFields returns only edited fields and previewFields clips long text', () => {
+test('changedFields returns only edited fields and pending fields retain their complete text', () => {
   assert.deepEqual(CC.changedFields({ a: 1, b: [1, 2], c: 'x' }, { a: 1, b: [1, 2], c: 'y', d: 'new' }), { c: 'y', d: 'new' });
   assert.deepEqual(CC.changedFields(undefined, { a: 1 }), { a: 1 });
-  const clipped = CC.previewFields({ text: 'x'.repeat(5000), n: 3 });
-  assert.equal(clipped.text.length, 1001);
-  assert.equal(clipped.n, 3);
+  const text = 'x'.repeat(5000) + ' unsaved tail';
+  const pending = CC.previewFields({ text, n: 3 });
+  assert.equal(pending.text, text);
+  assert.equal(pending.n, 3);
 });
 
 test('editorContext picks the first dirty form, lists several, and is undefined without forms', () => {
@@ -51,6 +52,14 @@ test('buildContext lists the publication, page and stories; nothing real open me
   assert.equal(empty.project, undefined);
 });
 
+test('a selected story after the first thirty remains in the context', () => {
+  const stories = Array.from({ length: 35 }, (_, index) => ({ id: index + 1, frames: [] }));
+  const ctx = CC.buildContext({ page: 'pages', publication: { id: 'p1', page_count: 1 },
+    inspection: { stories }, storyId: 35, story: { text: 'Selected story' } });
+  assert.equal(ctx.active_objects.filter(o => o.kind === 'story').length, 35);
+  assert.equal(ctx.active_objects.find(o => o.kind === 'story' && o.selected)?.story_id, 35);
+});
+
 // ---- the shipping app.js against stubbed DOM and API ----
 class Element {
   constructor() { this.dataset = {}; this.value = ''; this.textContent = ''; this.innerHTML = ''; this.hidden = false; this.options = []; this.open = false; this.values = {}; this.classList = { add() {}, remove() {}, toggle() {} }; }
@@ -73,6 +82,7 @@ function boot(state) {
   const calls = [];
   const fetch = async (path, options = {}) => {
     calls.push(`${options.method || 'GET'} ${path}`);
+    await state.beforeFetch?.(path, options);
     if (state.failAll) return respond({ detail: 'down' }, false, 500);
     if (path === '/api/health') return respond({ configured: true });
     if (path === '/api/publications') return respond([pub]);
@@ -124,6 +134,36 @@ test('context() reads the open publication through the app API and includes unsa
   assert.equal(kinds.frame_create.object_id, null);
   assert.deepEqual(kinds.swatch_create.fields, { c: 0, m: 100 });
   assert.equal(kinds.page_parent.dirty, false);
+});
+
+test('context resolution keeps the captured view, page, story and pending forms during navigation', async () => {
+  const state = { inspection, text: 'Original words' };
+  const app = await openPages(state);
+  const draft = 'x'.repeat(1300) + ' unsaved tail';
+  app.q('#story-text').value = draft;
+  let release;
+  const pendingFetch = new Promise(resolve => { release = resolve; });
+  let fetched;
+  const reached = new Promise(resolve => { fetched = resolve; });
+  state.beforeFetch = path => {
+    if (path === '/api/publications/p1') { fetched(); return pendingFetch; }
+  };
+  const pending = app.window.hoardCopilot.context();
+  await reached;
+  vm.runInContext('showView("settings"); page = 1; storyId = 99;', app.context);
+  app.q('#story-text').value = 'New view draft';
+  release();
+  const ctx = plain(await pending);
+  assert.equal(ctx.view.page, 'pages');
+  assert.equal(ctx.view.page_index, 0);
+  assert.equal(ctx.view.editor.object_id, 'p1:1');
+  assert.equal(ctx.view.editor.fields.text, draft);
+  assert.equal(ctx.active_objects.find(o => o.kind === 'story' && o.selected)?.story_id, 1);
+  assert(app.calls.includes('GET /api/publications/p1/stories/1'));
+  assert(!app.calls.includes('GET /api/publications/p1/stories/99'));
+  const next = plain(await app.window.hoardCopilot.context());
+  assert.equal(next.view.page, 'settings');
+  assert.deepEqual(next.active_objects, []);
 });
 
 test('the creation dialog answers context-request as a new-object form', async () => {

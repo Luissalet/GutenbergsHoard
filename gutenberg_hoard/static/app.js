@@ -386,16 +386,18 @@ function copilotSnapshots() {
 async function copilotContext() {
   const CC = globalThis.gutenbergCopilotContext;
   try {
-    const forms = CC.editorContext(window);
+    const snapshot = { view: currentView, publicationId: current?.id,
+      pageIndex: page, storyId, inspection, forms: CC.editorContext(window) };
     let pub = null, insp = null, story = null;
-    if (current && currentView === 'pages') {
-      try { pub = await request(`/api/publications/${current.id}`); } catch { pub = null; }
+    if (snapshot.publicationId && snapshot.view === 'pages') {
+      try { pub = await request(`/api/publications/${snapshot.publicationId}`); } catch { pub = null; }
       if (pub) {
-        try { insp = await request(`/api/publications/${pub.id}/inspection`); } catch { insp = inspection; }
-        if (storyId) { try { story = await request(`/api/publications/${pub.id}/stories/${storyId}`); } catch { story = null; } }
+        try { insp = await request(`/api/publications/${pub.id}/inspection`); } catch { insp = snapshot.inspection; }
+        if (snapshot.storyId) { try { story = await request(`/api/publications/${pub.id}/stories/${snapshot.storyId}`); } catch { story = null; } }
       }
     }
-    return CC.buildContext({ page: currentView, publication: pub, pageIndex: page, inspection: insp, storyId, story, forms });
+    return CC.buildContext({ page: snapshot.view, publication: pub, pageIndex: snapshot.pageIndex,
+      inspection: insp, storyId: snapshot.storyId, story, forms: snapshot.forms });
   } catch { return { active_objects: [], view: { page: 'workspace' } }; }
 }
 

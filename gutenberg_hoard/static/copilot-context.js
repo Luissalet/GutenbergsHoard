@@ -5,7 +5,7 @@
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const MAX_FIELD = 1000;
 
-  // Long drafts travel as short previews, never as whole documents.
+  // Saved story previews are summaries; tools can retrieve their full text.
   function clip(value, max) {
     const limit = max || MAX_FIELD;
     const text = String(value == null ? "" : value);
@@ -19,7 +19,8 @@
   }
 
   function previewFields(fields) {
-    return Object.fromEntries(Object.entries(fields || {}).map(([k, v]) => [k, typeof v === "string" ? clip(v) : v]));
+    // Unsaved fields have no native document copy from which to recover a tail.
+    return { ...(fields || {}) };
   }
 
   // Ask every open form for its state. Each form answers with
@@ -71,7 +72,7 @@
           kind: "page", object_id: `${pub.id}:${idx}`, title: `Page ${idx + 1} of ${pub.page_count}`,
           page_index: idx, parent: pageInfo ? pageInfo.parent : undefined,
         });
-        for (const s of ((inspection && inspection.stories) || []).slice(0, 30)) {
+        for (const s of ((inspection && inspection.stories) || [])) {
           const selected = String(s.id) === String(storyId);
           out.active_objects.push({
             kind: "story", object_id: `${pub.id}:${s.id}`, story_id: s.id, title: `Story ${s.id}`,
