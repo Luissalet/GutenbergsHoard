@@ -40,7 +40,7 @@
       "readiness": {"url": "{APP_URL}/api/health", "timeout_s": 25}
     }
   },
-  "x-family": {"agent_contract": true, "stack": "python"},
+  "x-family": {"agent_contract": true, "stack": "python", "copilot": true},
   "mcp": {
     "transport": "stdio",
     "command": "{PYTHON}",
