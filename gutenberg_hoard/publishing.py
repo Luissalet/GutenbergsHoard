@@ -69,6 +69,30 @@ def _text_result(action: dict, name: str) -> dict:
     return {}
 
 
+def _owned_publication_locked(publication_id: str) -> dict:
+    pub = store.get_publication(publication_id)
+    source = Path(pub["path"])
+    if source.suffix.lower() != ".designcraft":
+        return pub
+    # Keep the original directory so relative linked assets keep their meaning.
+    target = source.with_suffix(".gutenberg")
+    if target.exists():
+        target = source.with_name(f"{source.stem}-{uuid.uuid4().hex[:8]}.gutenberg")
+    write_bytes_atomic(target, source.read_bytes())
+    return store.use_owned_copy(publication_id, source, target)
+
+
+def owned_publication(publication_id: str) -> dict:
+    with _publication_lock(publication_id):
+        return _owned_publication_locked(publication_id)
+
+
+def open_editor(publication_id: str) -> dict:
+    from .app import _desktop_open
+    publication = owned_publication(publication_id)
+    return {"publication": publication, **_desktop_open(publication["path"])}
+
+
 def create_publication(title: str, pages: int, preset: str = "A4", facing_pages: bool = False,
                        margins: float = 36, colour_space: str = "RGB") -> dict:
     if not title.strip() or len(title) > 160:
@@ -79,14 +103,14 @@ def create_publication(title: str, pages: int, preset: str = "A4", facing_pages:
         raise ValueError("preset must be A4, A5, Letter, or Legal")
     if colour_space not in {"RGB", "CMYK"}:
         raise ValueError("colour_space must be RGB or CMYK")
-    native_path = store.publication_dir() / f"{store.safe_stem(title)}-{uuid.uuid4().hex[:8]}.designcraft"
+    native_path = store.publication_dir() / f"{store.safe_stem(title)}-{uuid.uuid4().hex[:8]}.gutenberg"
     try:
         actions = [{"name": "new_document", "arguments": {"title": title, "preset": preset,
                     "pages": pages, "facingPages": facing_pages, "margins": margins}}]
         if colour_space == "CMYK":
             actions.extend([
                 {"name": "execute", "arguments": {"command": "color.settings", "params": {
-                    "cmyk": "DesignCraft Generic CMYK (SWOP-like)", "intent": "relative", "bpc": True}}},
+                    "cmyk": "Gutenberg Generic CMYK (SWOP-like)", "intent": "relative", "bpc": True}}},
                 {"name": "execute", "arguments": {"command": "swatch.create", "params": {
                     "name": "Gutenberg Print Cyan", "color": {"c": 100, "m": 0, "y": 0, "k": 0}}}},
             ])
@@ -99,11 +123,11 @@ def create_publication(title: str, pages: int, preset: str = "A4", facing_pages:
         inspect = _text_result(results, "inspect_document")
         count = inspect.get("pageCount", pages)
         if not native_path.is_file() or count != pages:
-            raise RuntimeError(f"DesignCraft did not save the expected {pages}-page document (reported {count}).")
+            raise RuntimeError(f"Gutenberg did not save the expected {pages}-page document (reported {count}).")
         publication = store.add_publication(title, native_path, pages,
                                             {"preset": preset, "facing_pages": facing_pages, "margins_pt": margins,
                                              "requested_colour_space": colour_space,
-                                             "working_profile": "DesignCraft Generic CMYK (SWOP-like)" if colour_space == "CMYK" else "sRGB IEC61966-2.1",
+                                             "working_profile": "Gutenberg Generic CMYK (SWOP-like)" if colour_space == "CMYK" else "sRGB IEC61966-2.1",
                                              "native_cmyk_swatch": "Gutenberg Print Cyan" if colour_space == "CMYK" else None})
         _emit("publication.created", {"publication_id": publication["id"], "title": title, "pages": pages})
         return publication
@@ -114,7 +138,7 @@ def create_publication(title: str, pages: int, preset: str = "A4", facing_pages:
 
 def inspect_publication(publication_id: str) -> dict:
     with _publication_lock(publication_id):
-        pub = store.get_publication(publication_id)
+        pub = _owned_publication_locked(publication_id)
         results = native.run([{"name": "inspect_document", "arguments": {}}],
                              session_id=publication_id, open_path=pub["path"])
         _raise_native_errors(results)
@@ -123,7 +147,7 @@ def inspect_publication(publication_id: str) -> dict:
 
 def get_story(publication_id: str, story_id: int) -> dict:
     with _publication_lock(publication_id):
-        pub = store.get_publication(publication_id)
+        pub = _owned_publication_locked(publication_id)
         results = native.run([{"name": "get_story", "arguments": {"story": story_id}}],
                              session_id=publication_id, open_path=pub["path"])
         _raise_native_errors(results)
@@ -142,13 +166,13 @@ def set_story_text(publication_id: str, story_id: int, text: str, base_text: str
 
 
 def native_actions(publication_id: str, actions: list[dict], session_id: str | None = None) -> dict:
-    pub = store.get_publication(publication_id)
-    if not Path(pub["path"]).is_file():
-        raise FileNotFoundError("Native DesignCraft document is missing")
-    _validate_publication_actions(actions, Path(pub["path"]))
     # Open first in the same MCP process, so every native edit remains undoable there
-    # and the application stays the owner of the complete .designcraft document model.
+    # and the application stays the owner of the complete .gutenberg document model.
     with _publication_lock(publication_id):
+        pub = _owned_publication_locked(publication_id)
+        if not Path(pub["path"]).is_file():
+            raise FileNotFoundError("Native Gutenberg document is missing")
+        _validate_publication_actions(actions, Path(pub["path"]))
         before = Path(pub["path"]).read_bytes()
         active_session = session_id or publication_id
         try:
@@ -159,7 +183,7 @@ def native_actions(publication_id: str, actions: list[dict], session_id: str | N
             if current != before:
                 versions = store.publication_dir() / publication_id / "history"
                 versions.mkdir(parents=True, exist_ok=True)
-                snapshot = versions / f"{uuid.uuid4().hex}.designcraft"
+                snapshot = versions / f"{uuid.uuid4().hex}.gutenberg"
                 write_bytes_atomic(snapshot, before)
                 store.add_history(publication_id, snapshot)
             raise
@@ -167,7 +191,7 @@ def native_actions(publication_id: str, actions: list[dict], session_id: str | N
         if current != before:
             versions = store.publication_dir() / publication_id / "history"
             versions.mkdir(parents=True, exist_ok=True)
-            snapshot = versions / f"{uuid.uuid4().hex}.designcraft"
+            snapshot = versions / f"{uuid.uuid4().hex}.gutenberg"
             write_bytes_atomic(snapshot, before)
             store.add_history(publication_id, snapshot)
         _raise_native_errors(results)
@@ -175,7 +199,8 @@ def native_actions(publication_id: str, actions: list[dict], session_id: str | N
         count = int(inspect.get("pageCount", pub["page_count"]) or pub["page_count"])
         store.touch(publication_id, pages=count)
         _emit("publication.edited", {"publication_id": publication_id, "pages": count})
-        return {"publication": store.get_publication(publication_id), "results": results,
+        publication = {**store.get_publication(publication_id), "undo_available": store.has_history(publication_id)}
+        return {"publication": publication, "results": results,
                 "inspection": inspect, "undo_available": current != before,
                 "session_id": active_session}
 
@@ -208,7 +233,7 @@ def _validate_publication_actions(actions: list[dict], publication_path: Path) -
 
 def undo(publication_id: str) -> dict:
     with _publication_lock(publication_id):
-        pub = store.get_publication(publication_id)
+        pub = _owned_publication_locked(publication_id)
         target = Path(pub["path"])
         entry = store.peek_history(publication_id)
         if entry is None:
@@ -220,7 +245,7 @@ def undo(publication_id: str) -> dict:
         if snapshot is None or not snapshot.is_file():
             raise LookupError("No saved Gutenberg edit is available to undo")
         # Atomically replace the current file so a reader never observes a partial archive.
-        fd, tmp_name = tempfile.mkstemp(prefix=".gutenberg-undo-", suffix=".designcraft", dir=target.parent)
+        fd, tmp_name = tempfile.mkstemp(prefix=".gutenberg-undo-", suffix=".gutenberg", dir=target.parent)
         os.close(fd)
         try:
             shutil.copyfile(snapshot, tmp_name)
@@ -228,7 +253,7 @@ def undo(publication_id: str) -> dict:
             snapshot.unlink(missing_ok=True)
         finally:
             Path(tmp_name).unlink(missing_ok=True)
-        # Ask DesignCraft for authoritative page count after replaying the native snapshot.
+        # Ask Gutenberg for authoritative page count after replaying the native snapshot.
         from .engine_sessions import sessions
         sessions.reset_document(target)
         results = native.run([{"name": "inspect_document", "arguments": {}}], session_id=publication_id,
@@ -246,7 +271,7 @@ def render_page(publication_id: str, page: int, scale: float = 1.0) -> dict:
 
 
 def _render_page_locked(publication_id: str, page: int, scale: float) -> dict:
-    pub = store.get_publication(publication_id)
+    pub = _owned_publication_locked(publication_id)
     if page < 0 or page >= pub["page_count"]:
         raise ValueError("page index is outside the publication")
     if not 0.25 <= scale <= 4:
@@ -258,7 +283,7 @@ def _render_page_locked(publication_id: str, page: int, scale: float) -> dict:
                          session_id=publication_id, open_path=pub["path"])
     _raise_native_errors(results)
     if not output.is_file() or output.stat().st_size < 256:
-        raise RuntimeError("DesignCraft did not produce a page preview")
+        raise RuntimeError("Gutenberg did not produce a page preview")
     return {"page": page, "path": str(output), "url": f"/api/publications/{publication_id}/pages/{page}/preview",
             "bytes": output.stat().st_size}
 
@@ -274,10 +299,10 @@ def export_pdf(publication_id: str, scale: float = 1.5, renderer: str = "raster"
 
 def _export_native_pdf_locked(publication_id: str) -> dict:
     """Export from the open native document and report what the artifact proves."""
-    pub = store.get_publication(publication_id)
+    pub = _owned_publication_locked(publication_id)
     source_path = Path(pub["path"]).resolve()
     if not source_path.is_file():
-        raise FileNotFoundError("Native DesignCraft document is missing")
+        raise FileNotFoundError("Native Gutenberg document is missing")
     output_path = store.publication_dir() / f"{source_path.stem}-native.pdf"
     temp_path = output_path.with_name(f".{output_path.stem}-{uuid.uuid4().hex}.tmp.pdf")
     action = [{"name": "execute", "arguments": {"command": "file.exportPdf", "params": {
@@ -287,12 +312,12 @@ def _export_native_pdf_locked(publication_id: str) -> dict:
         _raise_native_errors(results)
         payload = _text_result(results, "execute")
         if not payload:
-            raise RuntimeError("DesignCraft native PDF export returned no artifact receipt")
+            raise RuntimeError("Gutenberg native PDF export returned no artifact receipt")
         reported_path = payload.get("path")
         if reported_path and Path(str(reported_path)).resolve() != temp_path.resolve():
-            raise RuntimeError("DesignCraft native PDF export returned an unexpected output path")
+            raise RuntimeError("Gutenberg native PDF export returned an unexpected output path")
         if not temp_path.is_file() or temp_path.stat().st_size < 128:
-            raise RuntimeError("DesignCraft did not produce a native PDF")
+            raise RuntimeError("Gutenberg did not produce a native PDF")
         try:
             from pypdf import PdfReader
             reader = PdfReader(str(temp_path))
@@ -328,7 +353,7 @@ def _export_native_pdf_locked(publication_id: str) -> dict:
 
 
 def _export_pdf_locked(publication_id: str, scale: float) -> dict:
-    pub = store.get_publication(publication_id)
+    pub = _owned_publication_locked(publication_id)
     if not 0.5 <= scale <= 4:
         raise ValueError("scale must be between 0.5 and 4")
     estimated_pixels = 595 * 842 * pub["page_count"] * scale * scale
@@ -375,4 +400,4 @@ def _export_pdf_locked(publication_id: str, scale: float) -> dict:
 def _raise_native_errors(results: list[dict]) -> None:
     failed = [result for result in results if result.get("is_error")]
     if failed:
-        raise RuntimeError(f"DesignCraft MCP {failed[0]['name']} failed: {failed[0].get('result')}")
+        raise RuntimeError(f"Gutenberg MCP {failed[0]['name']} failed: {failed[0].get('result')}")

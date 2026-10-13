@@ -32,6 +32,9 @@ def _db() -> sqlite3.Connection:
     cols = {row[1] for row in con.execute("PRAGMA table_info(publication_history)")}
     if "after_sha256" not in cols:
         con.execute("ALTER TABLE publication_history ADD COLUMN after_sha256 TEXT NOT NULL DEFAULT ''")
+    publication_cols = {row[1] for row in con.execute("PRAGMA table_info(publications)")}
+    if "original_native_path" not in publication_cols:
+        con.execute("ALTER TABLE publications ADD COLUMN original_native_path TEXT")
     con.commit()
     return con
 
@@ -74,6 +77,14 @@ def touch(publication_id: str, title: str | None = None, pages: int | None = Non
     with _db() as con:
         con.execute("UPDATE publications SET title=?,page_count=?,updated_at=? WHERE id=?",
                     (title or pub["title"], pages or pub["page_count"], datetime.now(timezone.utc).isoformat(), publication_id))
+    return get_publication(publication_id)
+
+
+def use_owned_copy(publication_id: str, original: Path, target: Path) -> dict:
+    """Caller holds the publication lock; preserve the source reference and record identity."""
+    with _db() as con:
+        con.execute("UPDATE publications SET native_path=?, original_native_path=COALESCE(original_native_path, ?) WHERE id=? AND native_path=?",
+                    (str(target.resolve()), str(original.resolve()), publication_id, str(original.resolve())))
     return get_publication(publication_id)
 
 

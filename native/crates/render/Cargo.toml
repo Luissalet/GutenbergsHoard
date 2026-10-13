@@ -1,0 +1,26 @@
+[package]
+name = "gutenberg-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Gutenberg renderer: spreads, pages, frames, composed text and images to pixels (vello_cpu)"
+
+[lints]
+workspace = true
+
+[dependencies]
+gutenberg-geom = { workspace = true }
+gutenberg-color = { workspace = true }
+gutenberg-doc = { workspace = true }
+gutenberg-fonts = { workspace = true }
+gutenberg-compose = { workspace = true }
+vello_cpu = { workspace = true }
+vello_common = { workspace = true }
+image = { workspace = true }
+hayro = { workspace = true }
+gutenberg-images = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+vello_cpu = { workspace = true, features = ["multithreading"] }

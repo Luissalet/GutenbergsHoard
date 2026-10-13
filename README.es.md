@@ -1,40 +1,31 @@
 # Gutenberg's Hoard
 
-**Un espacio local para publicaciones editoriales paginadas.** Gutenberg organiza los documentos de publicación y sus referencias de origen. DesignCraft es responsable de la maquetación nativa, las historias, los marcos, las páginas maestras, los estilos, las muestras de color, el historial y el renderizado.
+**Un espacio local para publicaciones editoriales paginadas.** Gutenberg organiza los documentos de publicación y sus referencias de origen. El motor incorporado de Gutenberg es responsable de la maquetación nativa, las historias, los marcos, las páginas maestras, los estilos, las muestras de color, el historial y el renderizado.
 
-Esta primera versión es operativa, pero no afirma paridad con las suites de autoedición. El motor verificado es DesignCraft `0.2.1` (commit de lanzamiento `80b3e3c`, 2026-10-06), con licencia MIT o Apache-2.0. La versión instalada ofrece exportación PDF nativa mediante `file.exportPdf`. Gutenberg conserva todo el catálogo MCP nativo y su vía de llamada, y añade catálogo de publicaciones, referencias de origen, espacio de páginas, sesiones de agente persistentes, instantáneas y deshacer, vistas previas y dos renderizadores de PDF.
+El motor y el editor completos viven en `native/`, con código fuente, formato ZIP, bibliotecas, licencias y build propios. La fuente inicial es DesignCraft0.2.1, revisión `80b3e3cb74618b02f40b80ac7c2fa35e5da4e1af`, incorporada y mantenida en este repositorio. No requiere un checkout, paquete ni CLI/GUI de aquella aplicación. `native/PROVENANCE.json`, NOTICE y los avisos MIT/Apache/OFL conservan la procedencia y derechos originales. El icono es el del Hoard y la marca protegida de la referencia se ha retirado del código. No se afirma equivalencia universal con otras suites.
 
 ## Funciones actuales
 
-- Crear y reabrir archivos `.designcraft` con páginas A4, A5, Letter o Legal, márgenes, páginas enfrentadas y un flujo de color solicitado.
-- Consultar el catálogo MCP real, sus recursos y el registro completo de comandos de DesignCraft. La versión probada devuelve 25 herramientas MCP y 432 comandos; el catálogo se descubre del motor instalado, no se codifica a mano.
-- Invocar herramientas, prompts y recursos nativos sin lista restrictiva. Cada publicación puede mantener un `session_id` estable para conservar vivo el proceso de DesignCraft y su historial entre llamadas. El servidor guarda después de cada edición. Al reiniciar Gutenberg, las sesiones del motor se cierran; el deshacer nativo vive durante el proceso, y Gutenberg conserva hasta 30 instantáneas para deshacer tras un reinicio.
-- Añadir marcos de texto, consultar y editar historias nativas, crear y aplicar páginas maestras y crear muestras de proceso CMYK desde el espacio de páginas. Para distribuir historias enlazadas, ajustar tipografía, estilos y composición avanzada, se puede continuar en DesignCraft.
+- Crear y reabrir archivos `.gutenberg` con páginas A4, A5, Letter o Legal, márgenes, páginas enfrentadas y un flujo de color solicitado.
+- Consultar el catálogo MCP real, sus recursos y el registro completo de comandos de Gutenberg. La versión probada devuelve 25 herramientas MCP y 432 comandos; el catálogo se descubre del motor instalado, no se codifica a mano.
+- Invocar herramientas, prompts y recursos nativos sin lista restrictiva. Cada publicación puede mantener un `session_id` estable para conservar vivo el proceso de Gutenberg y su historial entre llamadas. El servidor guarda después de cada edición. Al reiniciar Gutenberg, las sesiones del motor se cierran; el deshacer nativo vive durante el proceso, y Gutenberg conserva hasta 30 instantáneas para deshacer tras un reinicio.
+- Añadir marcos de texto, consultar y editar historias nativas, crear y aplicar páginas maestras y crear muestras de proceso CMYK desde el espacio de páginas. Para distribuir historias enlazadas, ajustar tipografía, estilos y composición avanzada, se puede continuar en Gutenberg.
 - Enlazar una publicación con su fuente mediante referencias `hoard://` y Hoard Hub. La fuente conserva su propietario y no se copia.
-- Renderizar vistas previas con DesignCraft.
-- Exportar PDF multipágina nativo mediante `file.exportPdf` de DesignCraft. Gutenberg verifica el archivo y el número de páginas, devuelve las advertencias del motor y comprueba si el PDF real permite extraer algún texto. Esa comprobación no demuestra que todas las historias sean buscables: si falla la incrustación de fuentes, el motor puede convertir los glifos en contornos. La exportación nativa no afirma conformidad PDF/X ni PDF/UA.
+- Renderizar vistas previas con Gutenberg.
+- Exportar PDF multipágina nativo mediante `file.exportPdf` de Gutenberg. Gutenberg verifica el archivo y el número de páginas, devuelve las advertencias del motor y comprueba si el PDF real permite extraer algún texto. Esa comprobación no demuestra que todas las historias sean buscables: si falla la incrustación de fuentes, el motor puede convertir los glifos en contornos. La exportación nativa no afirma conformidad PDF/X ni PDF/UA.
 - Mantener la exportación PDF raster existente para compatibilidad e imágenes RGB previsibles. El texto raster no se puede seleccionar ni buscar; tampoco se conservan trazados vectoriales, separaciones CMYK, tintas planas, sangrado ni conformidad PDF/X. Un límite de megapíxeles evita que documentos grandes agoten la memoria; para documentos largos se reduce la escala.
 - Leer los perfiles de trabajo existentes de Hoard Hub. Seleccionar un perfil guarda el contexto de trabajo; no crea cuentas ni inicia o detiene perfiles.
 
 ## Instalación en Windows
 
-Instala Python 3.11 o posterior y descarga por separado DesignCraft desde su proyecto oficial. No copies sus ejecutables a este repositorio. La instalación crea el `.venv` dedicado, instala HoardLink en modo editable e instala esta app:
+Python3.11+ y Rust1.95, con HoardLink disponible en su checkout compartido. La instalación crea un entorno dedicado, instala las dependencias y construye los dos ejecutables propios:
 
 ```powershell
 $env:HOARD_LINK_ROOT = 'C:\ruta\a\HoardLink'
-$env:GUTENBERG_DESIGNCRAFT_CLI = 'D:\ruta\a\designcraft-cli.exe'
-.\scripts\setup.ps1 -HoardLink $env:HOARD_LINK_ROOT -DesignCraftCli $env:GUTENBERG_DESIGNCRAFT_CLI
+./scripts/setup.ps1 -DebugEngine
 ```
 
-La instalación guarda la ruta de DesignCraft en `local-config.json`, ignorado por Git, solo cuando todavía no hay una. Las siguientes instalaciones preservan el valor existente. La app prefiere `GUTENBERG_DESIGNCRAFT_CLI` y después lee el archivo local. Arranca con el Python dedicado:
-
-```powershell
-.\.venv\Scripts\python.exe .\scripts\launch.py
-```
-
-Hub inicia la app en loopback, puerto estricto `5218`, y ejecuta MCP stdio con el mismo `.venv`. El lanzador manual busca un puerto disponible desde `5218`; `GUTENBERG_PORT=0` solicita un puerto libre al sistema. Los datos se guardan por defecto en `./data`, incluido el perfil aislado de DesignCraft. La aplicación no tiene inicio de sesión ni administración de cuentas.
-
-El botón de escritorio abre el `.designcraft` seleccionado mediante el canal de control documentado por DesignCraft: ejecuta `designcraft.exe --control <puerto>` y luego la CLI verificada llama a `file.open {path}`. El canal solo escucha en loopback y usa un puerto local disponible.
+Sin `-DebugEngine` se solicita un build release. La verificación de esta entrega usa debug; no se atribuye un build release no ejecutado. También puede ejecutarse `python scripts/build_engine.py --debug`. Los binarios quedan en `native/bin/`; source y Cargo.lock están versionados. Las configuraciones históricas `designcraft_cli/gui` se conservan como datos, pero no seleccionan el motor. No se descarga ni configura la app de referencia.
 
 ## Asistente de Faustus
 
@@ -50,29 +41,26 @@ La regresión opcional `tests/browser_copilot_context.py` acepta rutas `--cli`, 
 
 ## MCP
 
-El manifiesto de plugin está en [`faustus-plugin.json`](faustus-plugin.json). Inicia `python -m gutenberg_hoard.mcp_server` mediante stdio y configura `PYTHONPATH` para este repositorio y HoardLink. Define `FAUSTUS_PYTHON`, `GUTENBERG_DESIGNCRAFT_CLI` y `HOARDLINK_DIR` en el host.
+El manifiesto de plugin está en [`faustus-plugin.json`](faustus-plugin.json). Inicia `python -m gutenberg_hoard.mcp_server` mediante stdio y configura `PYTHONPATH` para este repositorio y HoardLink. El entorno dedicado contiene HoardLink; el motor se selecciona únicamente del build local.
 
-Las herramientas principales son `gutenberg_publications`, `gutenberg_create_publication`, `gutenberg_designcraft_catalog`, `gutenberg_designcraft_session`, `gutenberg_designcraft_raw_session`, `gutenberg_undo`, `gutenberg_export_pdf` y `gutenberg_link_source`. `gutenberg_export_pdf` acepta `renderer="native"` o `renderer="raster"`; raster sigue siendo el valor por defecto para las llamadas existentes y admite `scale`. La exportación nativa abre el documento registrado sin guardarlo ni modificarlo y devuelve la URL, el número de páginas, el resultado de extracción de texto y las advertencias del motor. Las dos herramientas de sesión permiten despachar herramientas, prompts y recursos nativos sin un filtro de funciones. El catálogo devuelve los esquemas que anuncia el ejecutable instalado. Cada consumidor puede mantener una sesión estable; las ediciones de publicaciones se guardan y generan una instantánea.
+Las herramientas principales son `gutenberg_publications`, `gutenberg_create_publication`, `gutenberg_engine_catalog`, `gutenberg_engine_session`, `gutenberg_engine_raw_session`, `gutenberg_undo`, `gutenberg_export_pdf` y `gutenberg_link_source`. `gutenberg_export_pdf` acepta `renderer="native"` o `renderer="raster"`; raster sigue siendo el valor por defecto para las llamadas existentes y admite `scale`. La exportación nativa abre el documento registrado sin guardarlo ni modificarlo y devuelve la URL, el número de páginas, el resultado de extracción de texto y las advertencias del motor. Las dos herramientas de sesión permiten despachar herramientas, prompts y recursos nativos sin un filtro de funciones. El catálogo devuelve los esquemas que anuncia el ejecutable instalado. Cada consumidor puede mantener una sesión estable; las ediciones de publicaciones se guardan y generan una instantánea.
 
 La API se inicia con `python -m gutenberg_hoard`; la entrada MCP usa stdio y no abre un servidor web. Las rutas locales incluyen `/api/health`, `/api/publications`, `/api/native/catalog`, `/api/native/session` y `/api/profiles`.
 
+MCP stdio y el contrato agente HTTP ofrecen19 herramientas. Se conservan los cuatro nombres históricos `gutenberg_designcraft_*` como alias; `gutenberg_render_page` ofrece el PNG de una página y `gutenberg_open_editor` abre el editor completo incorporado. Detalles en [API.md](docs/API.md).
+
 ## Datos y compatibilidad
 
-- `data/gutenberg.db` contiene el catálogo local y el historial; cada original se conserva como archivo `.designcraft` independiente en `data/publications/`.
+- `data/gutenberg.db` contiene el catálogo local y el historial; cada original se conserva como archivo `.gutenberg` independiente en `data/publications/`.
 - El código importa el paquete compartido `hoard-link`; no incluye una copia privada ni recrea contratos compartidos de rutas, escrituras atómicas, tokens, referencias, tema o perfiles.
 - `hoard://gutenberg/publication/<id>` identifica una publicación propiedad de Gutenberg. Los otros Hoards mantienen sus registros y originales.
-- La compatibilidad del formato y las funciones de DesignCraft dependen de la versión oficial instalada. Gutenberg no afirma implementar por su cuenta todos los flujos de edición que describe el upstream.
+- El motor incorporado, el formato y las APIs evolucionan en este repositorio. La importación histórica no promete compatibilidad futura con la aplicación de referencia.
 
 ## Verificación
 
-Ejecuta las pruebas con HoardLink y las dependencias instaladas:
+`./.venv/Scripts/python.exe -m pytest -q` ejecuta la suite y el motor real construido. Datos de QA en carpetas temporales o instancia privada con `GUTENBERG_DATA_DIR` explícito. Los CLI/GUI históricos se fijaron a rutas inexistentes. Se comprobó creación/edición, texto con comparación de base, páginas maestras, CMYK, imágenes incrustadas, cierre/reapertura, undo y PDF multipágina nativo/raster. La UI mantiene Deshacer disponible tras guardar mediante la metadata compartida. No se cargan modelos.
 
-```powershell
-$env:GUTENBERG_DESIGNCRAFT_CLI = 'D:\ruta\a\designcraft-cli.exe'
-pytest -q
-```
-
-Las pruebas de integración usan sesiones MCP reales de DesignCraft, crean documentos aislados, los editan y deshacen, renderizan PNG auténticos y verifican las páginas del PDF raster. La exportación nativa se verifica por separado con el motor instalado, incluidas sus advertencias y el informe de extracción de texto. No arrancan modelos ni acceden a servicios de red. Pytest guarda las pruebas y los artefactos temporales en sus propios directorios temporales.
+Los ZIP/JSON históricos `.designcraft` se importan a una copia `.gutenberg`, conservando original, ID, carpeta base para recursos enlazados, perfiles e historial. Nuevos guardados usan `application/vnd.gutenberg+zip` y `meta.format=gutenberg`; un snapshot histórico puede conservar su contenedor anterior, que el lector propio admite. Se guarda `original_native_path` sin borrar columnas previas. La GUI y el motor directo también abren un histórico hacia una copia; guardar sin ruta usa esa copia. Guardados explícitos en una sesión raw siguen siendo operaciones elegidas por el llamante.
 
 ## Referencias upstream
 

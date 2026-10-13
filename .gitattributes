@@ -1,0 +1,7 @@
+native/** text=auto
+native/**/*.rs text eol=lf
+native/**/*.toml text eol=lf
+native/Cargo.lock text eol=lf
+native/**/*.ttf binary
+native/**/*.png binary
+native/**/*.ico binary

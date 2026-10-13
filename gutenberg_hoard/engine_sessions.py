@@ -1,4 +1,4 @@
-"""Persistent DesignCraft MCP sessions, isolated on a dedicated event-loop thread."""
+"""Persistent Gutenberg MCP sessions, isolated on a dedicated event-loop thread."""
 from __future__ import annotations
 
 import asyncio
@@ -50,7 +50,7 @@ class NativeSessions:
             self._thread = threading.Thread(target=worker, name="gutenberg-designcraft-mcp", daemon=True)
             self._thread.start()
             if not ready.wait(5) or self._loop is None:
-                raise RuntimeError("Could not start the DesignCraft MCP session thread")
+                raise RuntimeError("Could not start the Gutenberg MCP session thread")
             return self._loop
 
     def execute(self, actions: list[dict[str, Any]], *, session_id: str | None = None,
@@ -74,8 +74,8 @@ class NativeSessions:
                     raise
                 future.cancel()
                 if not cleanup_complete.wait(timeout=15):
-                    raise TimeoutError("DesignCraft MCP one-shot timed out; engine cleanup is still pending") from exc
-                raise TimeoutError("DesignCraft MCP one-shot exceeded five minutes") from exc
+                    raise TimeoutError("Gutenberg MCP one-shot timed out; engine cleanup is still pending") from exc
+                raise TimeoutError("Gutenberg MCP one-shot exceeded five minutes") from exc
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", session_id):
             raise ValueError("session_id must be 1–100 letters, digits, underscore, or hyphen")
         loop = self._ensure_loop()
@@ -86,7 +86,7 @@ class NativeSessions:
             return future.result(timeout=300)
         except concurrent.futures.TimeoutError as exc:
             future.cancel()
-            raise TimeoutError("DesignCraft MCP session exceeded five minutes") from exc
+            raise TimeoutError("Gutenberg MCP session exceeded five minutes") from exc
 
     async def _one_shot(self, actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         params = StdioServerParameters(command=str(executable()), args=["mcp"], env=_environment())
@@ -108,7 +108,7 @@ class NativeSessions:
                         if path:
                             opened = await client.call_tool("open_document", {"path": str(path)})
                             if opened.isError:
-                                raise RuntimeError("DesignCraft could not open the publication: " + str(serial(opened)))
+                                raise RuntimeError("Gutenberg could not open the publication: " + str(serial(opened)))
                         if not ready.done():
                             ready.set_result(True)
                         while True:

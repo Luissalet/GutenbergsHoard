@@ -54,7 +54,7 @@ function renderPublications() {
   const grid = $('#publication-grid');
   $('#publication-count').textContent = `${publications.length} ${publications.length === 1 ? 'document' : 'documents'}`;
   if (!publications.length) {
-    grid.innerHTML = '<div class="empty"><div class="empty-icon">▤</div><h3>Your next issue starts here</h3><p>Create a publication to set its page size, margins and document structure.</p><button class="primary" id="empty-create">Create publication</button></div>';
+    grid.innerHTML = '<div class="empty"><div class="empty-icon">▤</div><h3>No publications yet</h3><p>Create a publication to set its page size, margins and document structure.</p><button class="primary" id="empty-create">Create publication</button></div>';
     $('#empty-create').onclick = openDialog;
     return;
   }
@@ -119,7 +119,7 @@ async function renderPages(quiet = false) {
   if (!current) return;
   if (page >= current.page_count) page = Math.max(0, current.page_count - 1);
   $('#editor-title').textContent = current.title;
-  $('#editor-subtitle').textContent = `${current.page_count} pages · ${current.profile.preset || 'A4'} · ${current.profile.requested_colour_space || 'RGB'} · editable DesignCraft source`;
+  $('#editor-subtitle').textContent = `${current.page_count} pages · ${current.profile.preset || 'A4'} · ${current.profile.requested_colour_space || 'RGB'} · editable Gutenberg source`;
   $('#page-total').textContent = current.page_count;
   $('#edit-native').disabled = false;
   $('#export-pdf').disabled = false;
@@ -273,8 +273,8 @@ async function exportPdf() {
       : 'Text is not searchable in raster output';
     result.innerHTML = `<b>${escapeHtml(String(d.pages))}-page ${escapeHtml(d.renderer)} PDF · ${escapeHtml(searchability)}</b>` +
       `<div><a href="${escapeHtml(d.url)}" target="_blank" rel="noopener">Open exported PDF</a></div>` +
-      (warnings.length ? `<div>DesignCraft warnings: ${warnings.map(escapeHtml).join(' · ')}</div>` :
-        (d.renderer === 'native' ? '<div>DesignCraft returned no export warnings.</div>' : ''));
+      (warnings.length ? `<div>Gutenberg warnings: ${warnings.map(escapeHtml).join(' · ')}</div>` :
+        (d.renderer === 'native' ? '<div>Gutenberg returned no export warnings.</div>' : ''));
     result.hidden = false;
     toast(`Exported ${d.pages}-page ${d.renderer} PDF.`);
     window.open(d.url, '_blank', 'noopener');
@@ -291,10 +291,10 @@ $('#pdf-renderer').onchange = syncPdfRenderer;
 syncPdfRenderer();
 
 async function launchNative() {
-  if (!current) return toast('Select a publication before opening DesignCraft.');
+  if (!current) return toast('Select a publication before opening Gutenberg.');
   try {
     await request(`/api/native/launch?publication_id=${encodeURIComponent(current.id)}`, { method: 'POST', body: '{}' });
-    toast('Opened this native publication in DesignCraft.');
+    toast('Opened this native publication in Gutenberg.');
   } catch (e) { toast(e.message); }
 }
 $('#open-native').onclick = launchNative;
@@ -302,8 +302,8 @@ $('#edit-native').onclick = launchNative;
 
 async function loadCatalog(force = false) {
   if (catalog && !force) return;
-  $('#tool-list').innerHTML = '<div class="empty compact">Reading installed DesignCraft tools…</div>';
-  try { catalog = await request('/api/native/catalog'); renderCatalog(); }
+  $('#tool-list').innerHTML = '<div class="empty compact">Reading installed Gutenberg tools…</div>';
+  try { catalog = await request('/api/engine/catalog'); renderCatalog(); }
   catch (e) { $('#tool-list').innerHTML = `<div class="empty compact">${escapeHtml(e.message)}</div>`; }
 }
 
@@ -312,7 +312,7 @@ function renderCatalog() {
   const commands = catalog.commands || [];
   const cli = catalog.cli || { commands: [], help: '' };
   $('#catalog-summary').innerHTML = `<div class="stat"><b>${tools.length}</b><small>Live native MCP tools</small></div><div class="stat"><b>${commands.length}</b><small>Native command registry entries</small></div><div class="stat"><b>${cli.commands.length}</b><small>Documented CLI verbs</small></div><div class="stat"><b>${(catalog.prompts || []).length + (catalog.resources || []).length + (catalog.resource_templates || []).length}</b><small>Additional MCP resources and prompts</small></div>`;
-  $('#tool-list').innerHTML = tools.map(t => `<article class="tool-item"><code>${escapeHtml(t.name)}</code><p>${escapeHtml(t.description || 'Native DesignCraft MCP tool')}</p></article>`).join('') || '<div class="empty compact">No tools were returned by the native server.</div>';
+  $('#tool-list').innerHTML = tools.map(t => `<article class="tool-item"><code>${escapeHtml(t.name)}</code><p>${escapeHtml(t.description || 'Native Gutenberg MCP tool')}</p></article>`).join('') || '<div class="empty compact">No tools were returned by the native server.</div>';
   $('#command-list').textContent = JSON.stringify(commands, null, 2);
   $('#cli-command').innerHTML = cli.commands.map(c => `<option value="${escapeHtml(c.command)}">${escapeHtml(c.command)}</option>`).join('');
   $('#cli-help').textContent = cli.help || 'No CLI help returned.';
@@ -331,7 +331,7 @@ $('#run-cli').onclick = async () => {
 async function loadSettings() {
   try {
     const [c, p] = await Promise.all([request('/api/config'), request('/api/profiles')]);
-    $('#settings-card').innerHTML = `<div class="settings-row"><span>DesignCraft CLI</span><code>${escapeHtml(c.designcraft_cli || 'Not configured')}</code></div><div class="settings-row"><span>Desktop editor</span><code>${escapeHtml(c.designcraft_gui || 'Not found next to CLI')}</code></div><div class="settings-row"><span>Application data</span><code>${escapeHtml(c.data_dir)}</code></div><div class="settings-row"><span>Native source</span><code>.designcraft · original document retained</code></div><div class="settings-row"><span>PDF export</span><code>Native DesignCraft or RGB raster · artifact reports warnings · no PDF/X claim</code></div>`;
+    $('#settings-card').innerHTML = `<div class="settings-row"><span>Gutenberg CLI</span><code>${escapeHtml(c.designcraft_cli || 'Not configured')}</code></div><div class="settings-row"><span>Desktop editor</span><code>${escapeHtml(c.designcraft_gui || 'Not found next to CLI')}</code></div><div class="settings-row"><span>Application data</span><code>${escapeHtml(c.data_dir)}</code></div><div class="settings-row"><span>Native source</span><code>.designcraft · original document retained</code></div><div class="settings-row"><span>PDF export</span><code>Native Gutenberg or RGB raster · artifact reports warnings · no PDF/X claim</code></div>`;
     const select = $('#hub-profile');
     select.innerHTML = '<option value="">No profile selected</option>' + p.profiles.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
     select.value = p.selected || '';
@@ -347,7 +347,7 @@ async function loadSettings() {
 async function health() {
   try {
     const d = await request('/api/health');
-    $('#engine-state').textContent = d.configured ? 'DesignCraft connected' : 'DesignCraft needs setup';
+    $('#engine-state').textContent = d.configured ? 'Gutenberg connected' : 'Gutenberg needs setup';
     $('#engine-state').classList.toggle('ready', d.configured);
   } catch { $('#engine-state').textContent = 'Local service'; }
 }

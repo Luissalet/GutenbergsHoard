@@ -1,0 +1,37 @@
+[package]
+name = "gutenberg-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Gutenberg engine: session, documents, history, selection, command registry, tool hosting"
+
+[lints]
+workspace = true
+
+[dependencies]
+gutenberg-images = { workspace = true }
+gutenberg-geom = { workspace = true }
+gutenberg-color = { workspace = true }
+gutenberg-doc = { workspace = true }
+gutenberg-fonts = { workspace = true }
+gutenberg-compose = { workspace = true }
+gutenberg-render = { workspace = true }
+gutenberg-format = { workspace = true }
+gutenberg-epub = { workspace = true }
+gutenberg-textimport = { workspace = true }
+gutenberg-pdf = { workspace = true }
+gutenberg-tools = { workspace = true }
+gutenberg-idml = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+regex = { workspace = true }
+quick-xml = { workspace = true }
+
+[dev-dependencies]
+zip = { workspace = true }
+hayro-syntax = "0.7.2"
+hayro-interpret = { version = "0.7.0", default-features = false, features = ["embed-fonts"] }
+hayro-cmap = "0.1"
+kurbo = { workspace = true }

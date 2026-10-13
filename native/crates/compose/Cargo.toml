@@ -1,0 +1,22 @@
+[package]
+name = "gutenberg-compose"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Gutenberg text composition: paragraph composer (Knuth–Plass), hyphenation, justification, columns, threading, wrap"
+
+[lints]
+workspace = true
+
+[dependencies]
+unicode-bidi = { workspace = true }
+gutenberg-geom = { workspace = true }
+gutenberg-color = { workspace = true }
+gutenberg-doc = { workspace = true }
+gutenberg-fonts = { workspace = true }
+log = { workspace = true }
+regex = { workspace = true }
+miniz_oxide = "0.8"
+
+[dev-dependencies]
+proptest = { workspace = true }

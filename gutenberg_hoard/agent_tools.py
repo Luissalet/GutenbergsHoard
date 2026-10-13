@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -89,43 +90,49 @@ def _link(args: LinkArgs) -> dict:
 TOOLS = [
     Tool("gutenberg_publications", "List locally catalogued editable publications.", agentkit.Empty,
          ann(read_only=True), lambda _ctx, _a: {"publications": store.list_publications()}),
-    Tool("gutenberg_create_publication", "Create an editable native DesignCraft publication.", CreateArgs,
+    Tool("gutenberg_create_publication", "Create an editable native Gutenberg publication.", CreateArgs,
          ann(), lambda _ctx, a: publishing.create_publication(a.title, a.pages, a.preset, a.facing_pages, a.margins, a.colour_space)),
-    Tool("gutenberg_designcraft_catalog", "Discover every native DesignCraft MCP schema and engine command.", agentkit.Empty,
+    Tool("gutenberg_designcraft_catalog", "Discover every native Gutenberg MCP schema and engine command.", agentkit.Empty,
          ann(read_only=True), lambda _ctx, _a: native.discover(), capped=False),
-    Tool("gutenberg_designcraft_cli", "Run any documented DesignCraft CLI command with literal argv and no shell.", NativeCliArgs,
+    Tool("gutenberg_designcraft_cli", "Run any documented Gutenberg CLI command with literal argv and no shell.", NativeCliArgs,
          ann(), lambda _ctx, a: native.cli_call(a.command, a.argv, a.timeout_s), timeout_s=600, capped=False),
-    Tool("gutenberg_designcraft_session", "Dispatch native DesignCraft MCP tools for a publication in a persistent saved session.", EditArgs,
+    Tool("gutenberg_designcraft_session", "Dispatch native Gutenberg MCP tools for a publication in a persistent saved session.", EditArgs,
          ann(), lambda _ctx, a: publishing.native_actions(a.publication_id, a.actions, a.session_id), capped=False),
     Tool("gutenberg_inspect_publication", "Read native pages, stories, parent pages, layers and swatches.", PublicationArgs,
          ann(read_only=True), lambda _ctx, a: publishing.inspect_publication(a.publication_id)),
-    Tool("gutenberg_get_story", "Read a complete native story by its DesignCraft story ID.", StoryArgs,
+    Tool("gutenberg_get_story", "Read a complete native story by its Gutenberg story ID.", StoryArgs,
          ann(read_only=True), lambda _ctx, a: publishing.get_story(a.publication_id, a.story_id)),
-    Tool("gutenberg_assign_parent", "Apply a native DesignCraft parent page to a publication page.", ParentArgs,
+    Tool("gutenberg_assign_parent", "Apply a native Gutenberg parent page to a publication page.", ParentArgs,
          ann(), lambda _ctx, a: publishing.native_actions(a.publication_id, [{"name": "execute", "arguments": {
              "command": "layout.pages.applyParent", "params": {"pages": [a.page], "parent": a.parent}}}])),
-    Tool("gutenberg_create_cmyk_swatch", "Create a native CMYK process-color swatch in the DesignCraft document.", SwatchArgs,
+    Tool("gutenberg_create_cmyk_swatch", "Create a native CMYK process-color swatch in the Gutenberg document.", SwatchArgs,
          ann(), lambda _ctx, a: publishing.native_actions(a.publication_id, [{"name": "execute", "arguments": {
              "command": "swatch.create", "params": {"name": a.name, "color": {"c": a.c, "m": a.m, "y": a.y, "k": a.k}}}}])),
-    Tool("gutenberg_designcraft_raw_session", "Dispatch the complete DesignCraft MCP surface in a stable session_id.", RawSessionArgs,
+    Tool("gutenberg_designcraft_raw_session", "Dispatch the complete Gutenberg MCP surface in a stable session_id.", RawSessionArgs,
          ann(), lambda _ctx, a: {"session_id": a.session_id, "results": native.run(a.actions, session_id=a.session_id)}, capped=False),
     Tool("gutenberg_undo", "Restore the last agent edit snapshot if the native document has not changed externally.", PublicationArgs,
          ann(), lambda _ctx, a: publishing.undo(a.publication_id)),
-    Tool("gutenberg_render_page", "Render a native DesignCraft page preview PNG.", PageArgs,
+    Tool("gutenberg_render_page", "Render a native Gutenberg page preview PNG.", PageArgs,
          ann(read_only=True), lambda _ctx, a: publishing.render_page(a.publication_id, a.page, a.scale)),
-    Tool("gutenberg_export_pdf", "Export a publication as a native DesignCraft PDF or an RGB raster PDF.", PdfArgs,
+    Tool("gutenberg_export_pdf", "Export a publication as a native Gutenberg PDF or an RGB raster PDF.", PdfArgs,
          ann(), lambda _ctx, a: publishing.export_pdf(a.publication_id, a.scale, a.renderer)),
     Tool("gutenberg_link_source", "Connect a publication to an owned source record through HoardLink.", LinkArgs,
          ann(idempotent=True), lambda _ctx, a: _link(a)),
 ]
 
 
-INSTRUCTIONS = ("Gutenberg owns the publication catalog and source links; DesignCraft owns native page layout. "
-                "Use gutenberg_designcraft_catalog to discover current engine schemas. Its session tool forwards "
-                "the entire native surface. Preserve .designcraft as the editable source. "
+INSTRUCTIONS = ("Gutenberg owns the publication catalog and source links; Gutenberg owns native page layout. "
+                "Use gutenberg_engine_catalog to discover current engine schemas. Its session tool forwards "
+                "the entire native surface. Preserve .gutenberg as the editable working source and keep historical originals unchanged. "
                 "gutenberg_export_pdf accepts renderer='native' or 'raster'; raster remains the default and accepts scale. "
                 "Native receipts report engine warnings and whether any PDF text was extractable; this does not prove "
                 "that every story is searchable or establish PDF/X or PDF/UA conformance.")
+
+# Both public names use the identical schema and handler; historical clients remain valid.
+TOOLS.extend(replace(tool, name=tool.name.replace("gutenberg_designcraft_", "gutenberg_engine_"))
+             for tool in list(TOOLS) if tool.name.startswith("gutenberg_designcraft_"))
+TOOLS.append(Tool("gutenberg_open_editor", "Open this publication in Gutenberg's incorporated complete desktop editor.",
+                  PublicationArgs, ann(), lambda _ctx, args: publishing.open_editor(args.publication_id)))
 
 router = make_agent_router(
     tools_fn=lambda: agentkit.tool_catalog(TOOLS),

@@ -53,7 +53,7 @@ def _desktop_open(path: str) -> dict:
     global _gui_process, _gui_port
     gui, cli = designcraft_gui(), designcraft_cli()
     if gui is None or cli is None:
-        raise RuntimeError("Configure the verified DesignCraft GUI and CLI executable paths.")
+        raise RuntimeError("Configure the verified Gutenberg GUI and CLI executable paths.")
     with _gui_lock:
         new_process = _gui_process is None or _gui_process.poll() is not None or _gui_port is None
         if new_process:
@@ -84,7 +84,7 @@ def _desktop_open(path: str) -> dict:
                     result = json.loads(command.stdout)
                 except ValueError:
                     result = {"result": command.stdout[-500:]}
-                return {"opened": True, "executable": str(gui), "control_port": control_port, "result": result}
+                return {"opened": True, "executable": str(gui), "pid": _gui_process.pid, "control_port": control_port, "result": result}
             last_error = command.stderr[-800:]
             if not new_process:
                 break
@@ -92,7 +92,7 @@ def _desktop_open(path: str) -> dict:
         if new_process:
             _gui_process = None
             _gui_port = None
-        raise RuntimeError("DesignCraft could not open the publication over its documented control channel: " + last_error)
+        raise RuntimeError("Gutenberg could not open the publication over its documented control channel: " + last_error)
 
 
 class CreatePublication(BaseModel):
@@ -165,11 +165,11 @@ def get_config() -> dict:
     return {"app": "gutenberg", "data_dir": str(app_paths.data_dir), "data_configured": app_paths.configured,
             "designcraft_cli": str(designcraft_cli()) if designcraft_cli() else None,
             "designcraft_gui": str(designcraft_gui()) if designcraft_gui() else None,
-            "native_format": ".designcraft", "pdf_export": {"available": True,
+            "native_format": ".gutenberg", "pdf_export": {"available": True,
             "renderers": ["native", "raster"], "default_renderer": "raster",
             "raster": {"kind": "multipage raster", "searchable_text": False, "colour_space": "RGB"},
-            "native": {"kind": "DesignCraft native PDF", "searchability": "checked on each exported artifact",
-                       "warnings": "returned by DesignCraft"}, "pdf_x": False}}
+            "native": {"kind": "Gutenberg native PDF", "searchability": "checked on each exported artifact",
+                       "warnings": "returned by Gutenberg"}, "pdf_x": False}}
 
 
 @app.get("/api/profiles")
@@ -212,7 +212,7 @@ def create_publication(payload: CreatePublication) -> dict:
 
 @app.get("/api/publications/{publication_id}")
 def publication(publication_id: str) -> dict:
-    return _run(lambda: {**store.get_publication(publication_id), "undo_available": store.has_history(publication_id)})
+    return _run(lambda: {**publishing.owned_publication(publication_id), "undo_available": store.has_history(publication_id)})
 
 
 @app.post("/api/publications/{publication_id}/native-actions")
@@ -258,7 +258,7 @@ def attach_source(publication_id: str, payload: dict) -> dict:
     def action():
         from hoard_link.artifacts import parse_ref
         from hoard_link import fam_refs
-        pub = store.get_publication(publication_id)
+        pub = publishing.owned_publication(publication_id)
         ref = parse_ref(str(payload.get("source", "")))
         p = paths().ensure()
         configure_family("gutenberg", str(p.data_dir), token_file=str(p.token_path))
@@ -297,12 +297,13 @@ def export_pdf(publication_id: str, payload: PdfExport) -> dict:
 def file(filename: str) -> FileResponse:
     target = store.publication_dir() / filename
     if target.name != filename or target.resolve().parent != store.publication_dir().resolve() \
-            or not target.is_file() or target.suffix.lower() not in {".pdf", ".designcraft"}:
+            or not target.is_file() or target.suffix.lower() not in {".pdf", ".gutenberg", ".designcraft"}:
         raise HTTPException(404, "File not found")
     mime = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
     return FileResponse(target, media_type=mime, filename=target.name)
 
 
+@app.get("/api/engine/catalog")
 @app.get("/api/native/catalog")
 def native_catalog() -> dict:
     return _run(native.discover)
@@ -316,7 +317,7 @@ def native_session(payload: NativeCalls) -> dict:
 
 @app.post("/api/native/launch")
 def launch_native(publication_id: str) -> dict:
-    return _run(lambda: _desktop_open(store.get_publication(publication_id)["path"]))
+    return _run(lambda: publishing.open_editor(publication_id))
 
 
 def _run(fn):

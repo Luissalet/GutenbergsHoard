@@ -1,4 +1,4 @@
-"""Lossless local bridge to DesignCraft's complete native MCP catalogue."""
+"""Lossless local bridge to Gutenberg's complete native MCP catalogue."""
 from __future__ import annotations
 
 import asyncio
@@ -19,7 +19,7 @@ from .config import designcraft_cli, paths
 def executable() -> Path:
     path = designcraft_cli()
     if path is None:
-        raise RuntimeError("Set GUTENBERG_DESIGNCRAFT_CLI to the verified local DesignCraft CLI executable.")
+        raise RuntimeError("Build the incorporated engine with python scripts/build_engine.py.")
     return path
 
 
@@ -65,7 +65,7 @@ async def catalog() -> dict[str, Any]:
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as client:
             await client.initialize()
-            result: dict[str, Any] = {"executable": str(exe), "tools": serial((await client.list_tools()).tools),
+            result: dict[str, Any] = {"engine": "Gutenberg engine", "source": "incorporated local source", "executable": str(exe), "tools": serial((await client.list_tools()).tools),
                                       "commands": command_catalog(), "cli": cli_help()}
             for method, key, attr in ((client.list_prompts, "prompts", "prompts"),
                                       (client.list_resources, "resources", "resources"),
@@ -104,13 +104,13 @@ def command_catalog() -> list[dict[str, Any]]:
     proc = subprocess.run([str(executable()), "commands"], capture_output=True, text=True, timeout=30,
                           env=_environment(), check=False)
     if proc.returncode != 0:
-        raise RuntimeError(f"DesignCraft command catalogue failed: {proc.stderr[-1200:]}")
+        raise RuntimeError(f"Gutenberg command catalogue failed: {proc.stderr[-1200:]}")
     try:
         data = json.loads(proc.stdout)
     except ValueError as exc:
-        raise RuntimeError("DesignCraft returned an invalid command catalogue") from exc
+        raise RuntimeError("Gutenberg returned an invalid command catalogue") from exc
     if not isinstance(data, list):
-        raise RuntimeError("DesignCraft command catalogue was not an array")
+        raise RuntimeError("Gutenberg command catalogue was not an array")
     return data
 
 
@@ -120,31 +120,31 @@ def cli_help() -> dict[str, Any]:
     # This release writes its usage/help text to stderr and returns 1 for --help.
     # Treat that as a successful discovery only when the expected CLI usage is present.
     output = "\n".join(part for part in (proc.stdout, proc.stderr) if part)
-    if proc.returncode != 0 and "designcraft-cli run" not in output:
-        raise RuntimeError(f"DesignCraft CLI help failed: {output[-1200:]}")
+    if proc.returncode != 0 and "gutenberg-cli run" not in output:
+        raise RuntimeError(f"Gutenberg CLI help failed: {output[-1200:]}")
     lines = output.splitlines()
     commands = []
     for line in lines:
         line = line.strip()
-        if line.startswith("usage: designcraft-cli "):
-            rest = line[len("usage: designcraft-cli "):]
-        elif line.startswith("designcraft-cli "):
-            rest = line[len("designcraft-cli "):]
+        if line.startswith("usage: gutenberg-cli "):
+            rest = line[len("usage: gutenberg-cli "):]
+        elif line.startswith("gutenberg-cli "):
+            rest = line[len("gutenberg-cli "):]
         else:
             continue
         command = rest.split(None, 1)[0]
         commands.append({"command": command, "usage": line})
     if not commands:
-        raise RuntimeError("DesignCraft returned no CLI commands in its help output")
+        raise RuntimeError("Gutenberg returned no CLI commands in its help output")
     return {"executable": str(executable()), "commands": commands, "help": output}
 
 
 def cli_call(command: str, argv: list[str], timeout_s: float = 120) -> dict[str, Any]:
-    """Run one complete documented DesignCraft CLI command without a shell."""
+    """Run one complete documented Gutenberg CLI command without a shell."""
     info = cli_help()
     allowed = {item["command"] for item in info["commands"]} | {"--version", "--help"}
     if command not in allowed:
-        raise ValueError(f"Unknown DesignCraft CLI command {command!r}; discover the installed CLI help first.")
+        raise ValueError(f"Unknown Gutenberg CLI command {command!r}; discover the installed CLI help first.")
     if len(argv) > 200 or any(not isinstance(item, str) or "\x00" in item for item in argv):
         raise ValueError("argv must contain at most 200 strings without NUL characters")
     if not 1 <= float(timeout_s) <= 600:

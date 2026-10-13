@@ -1,0 +1,90 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/gutenberg", "apps/gutenberg-cli"]
+default-members = ["apps/gutenberg", "apps/gutenberg-cli"]
+
+[workspace.package]
+version = "0.2.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.90"
+repository = "https://github.com/Luissalet/GutenbergsHoard"
+
+[workspace.dependencies]
+# internal
+gutenberg-geom = { path = "crates/geom" }
+gutenberg-color = { path = "crates/color" }
+gutenberg-doc = { path = "crates/doc" }
+gutenberg-fonts = { path = "crates/fonts" }
+gutenberg-compose = { path = "crates/compose" }
+gutenberg-images = { path = "crates/images" }
+gutenberg-render = { path = "crates/render" }
+gutenberg-pdf = { path = "crates/pdf" }
+gutenberg-idml = { path = "crates/idml" }
+gutenberg-epub = { path = "crates/epub" }
+gutenberg-textimport = { path = "crates/textimport" }
+gutenberg-format = { path = "crates/format" }
+gutenberg-tools = { path = "crates/tools" }
+gutenberg-engine = { path = "crates/engine" }
+gutenberg-ui-egui = { path = "crates/ui-egui" }
+gutenberg-mcp = { path = "crates/mcp" }
+gutenberg-testkit = { path = "crates/testkit" }
+
+# foundation
+kurbo = { version = "0.13", features = ["serde"] }
+thiserror = "2"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+log = "0.4"
+proptest = "1"
+rayon = "1"
+unicode-bidi = "0.3"
+regex = { version = "1", default-features = false, features = ["std", "unicode", "perf"] }
+
+# text / rendering / formats
+skrifa = "0.47"
+harfrust = "0.13"
+vello_cpu = "0.2"
+vello_common = { version = "0.2", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "tiff", "bmp"] }
+# SVG (same usvg as krilla-svg) and Photoshop composites.
+resvg = { version = "0.47", default-features = false, features = ["text"] }
+krilla-svg = "0.8"
+psd = "0.3"
+# Boolean operations on Bézier paths (Pathfinder).
+flo_curves = "0.8"
+# QR codes (Object › Generate QR Code); MIT.
+qrcodegen = "1.8"
+krilla = { version = "0.8", features = ["pdf"] }
+hayro = "0.7"
+quick-xml = "0.38"
+zip = { version = "3", default-features = false, features = ["deflate"] }
+
+# ui
+egui = "0.36"
+egui_extras = { version = "0.36", default-features = false, features = ["svg"] }
+eframe = { version = "0.36", default-features = false }
+egui_kittest = "0.36"
+rfd = "0.17"
+arboard = { version = "3.6", default-features = false }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+too_many_arguments = "allow"
+type_complexity = "allow"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+debug = 0

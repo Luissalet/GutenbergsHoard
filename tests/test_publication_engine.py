@@ -77,7 +77,7 @@ def test_distinct_mcp_sessions_reopen_after_another_session_saves():
 
 def test_native_story_parent_and_cmyk_workflow_are_editable():
     pub = publishing.create_publication("Print Feature QA", 2, colour_space="CMYK")
-    assert pub["profile"]["working_profile"] == "DesignCraft Generic CMYK (SWOP-like)"
+    assert pub["profile"]["working_profile"] == "Gutenberg Generic CMYK (SWOP-like)"
     assert pub["profile"]["native_cmyk_swatch"] in publishing.inspect_publication(pub["id"])["swatches"]
     frame = {"name": "execute", "arguments": {"command": "frame.create", "params": {
         "spread": 0, "rect": [50, 50, 520, 150], "content": "text", "text": "Original story words"}}}
@@ -114,7 +114,7 @@ def test_installed_cli_verbs_dispatch_without_a_shell():
     assert {"run", "commands", "describe", "script", "app", "mcp", "perf", "bench", "links"} <= commands
     result = native.cli_call("--version", [])
     assert result["returncode"] == 0
-    assert "designcraft-cli 0.2.1" in result["stdout"]
+    assert "gutenberg-cli 0.2.1" in result["stdout"]
 
 
 def test_parallel_edits_to_one_publication_are_serialized():

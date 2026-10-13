@@ -21,34 +21,19 @@ def _local_settings() -> dict:
         return {}
 
 
-def designcraft_cli() -> Path | None:
-    value = env_str("GUTENBERG_DESIGNCRAFT_CLI")
-    if not value:
-        value = str(_local_settings().get("designcraft_cli") or "").strip()
-    if not value:
-        return None
-    path = Path(value).expanduser()
-    if not path.is_absolute():
-        path = ROOT / path
-    path = path.resolve()
+def engine_cli() -> Path | None:
+    path = ROOT / "native/bin" / ("gutenberg-cli.exe" if os.name == "nt" else "gutenberg-cli")
     return path if path.is_file() else None
 
 
-def designcraft_gui() -> Path | None:
-    value = env_str("GUTENBERG_DESIGNCRAFT_GUI")
-    if not value:
-        value = str(_local_settings().get("designcraft_gui") or "").strip()
-    if value:
-        path = Path(value).expanduser()
-        if not path.is_absolute():
-            path = ROOT / path
-        path = path.resolve()
-        return path if path.is_file() else None
-    cli = designcraft_cli()
-    if cli and cli.name.lower() == "designcraft-cli.exe":
-        candidate = cli.with_name("designcraft.exe")
-        return candidate if candidate.is_file() else None
-    return None
+def engine_gui() -> Path | None:
+    path = ROOT / "native/bin" / ("gutenberg.exe" if os.name == "nt" else "gutenberg")
+    return path if path.is_file() else None
+
+
+# Historical import names remain aliases. Old configured paths are preserved as data.
+designcraft_cli = engine_cli
+designcraft_gui = engine_gui
 
 
 def port() -> int:

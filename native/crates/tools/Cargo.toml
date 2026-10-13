@@ -1,0 +1,17 @@
+[package]
+name = "gutenberg-tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Gutenberg tools: pointer events in, commands and overlays out (Selection, Direct Selection, frames, Type, Hand, Zoom…)"
+
+[lints]
+workspace = true
+
+[dependencies]
+gutenberg-geom = { workspace = true }
+gutenberg-color = { workspace = true }
+gutenberg-doc = { workspace = true }
+gutenberg-compose = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

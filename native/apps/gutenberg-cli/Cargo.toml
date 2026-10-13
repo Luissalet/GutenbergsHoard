@@ -1,0 +1,25 @@
+[package]
+name = "gutenberg-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "gutenberg-cli"
+path = "src/main.rs"
+
+[dependencies]
+gutenberg-engine = { workspace = true }
+gutenberg-render = { workspace = true }
+gutenberg-doc = { workspace = true }
+gutenberg-geom = { workspace = true }
+gutenberg-color = { workspace = true }
+gutenberg-compose = { workspace = true }
+gutenberg-format = { workspace = true }
+gutenberg-pdf = { workspace = true }
+gutenberg-mcp = { workspace = true }
+serde_json = { workspace = true }

@@ -1,7 +1,8 @@
 param(
   [string]$Python = "python",
   [string]$HoardLink = $env:HOARD_LINK_ROOT,
-  [string]$DesignCraftCli = $env:GUTENBERG_DESIGNCRAFT_CLI
+  [string]$DesignCraftCli = "",
+  [switch]$DebugEngine
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -22,6 +23,10 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "Could not install Gutenberg's Hoard dependencies." }
   if ($DesignCraftCli) {
     & $venvPython (Join-Path $root "scripts\configure.py") $DesignCraftCli
-    if ($LASTEXITCODE -ne 0) { throw "Could not save the local DesignCraft executable path." }
+    if ($LASTEXITCODE -ne 0) { throw "Could not retain the historical CLI setting." }
   }
+  $engineArgs = @((Join-Path $root "scripts\build_engine.py"))
+  if ($DebugEngine) { $engineArgs += "--debug" }
+  & $venvPython @engineArgs
+  if ($LASTEXITCODE -ne 0) { throw "Could not build Gutenberg's incorporated engine and editor." }
 } finally { Pop-Location }

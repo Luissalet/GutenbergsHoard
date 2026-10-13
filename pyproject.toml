@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gutenbergs-hoard"
 version = "0.1.0"
-description = "A local editorial publishing workspace backed by DesignCraft's native layout engine."
+description = "An editorial publishing workspace with an incorporated layout engine and desktop editor."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

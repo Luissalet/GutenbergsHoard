@@ -1,0 +1,28 @@
+[package]
+name = "gutenberg-pdf"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Gutenberg PDF export (krilla): real text with embedded font subsets, CMYK/spot colour, bleed and printer's marks"
+
+[lints]
+workspace = true
+
+[dependencies]
+gutenberg-geom = { workspace = true }
+gutenberg-color = { workspace = true }
+gutenberg-doc = { workspace = true }
+gutenberg-fonts = { workspace = true }
+gutenberg-compose = { workspace = true }
+krilla = { workspace = true }
+krilla-svg = { workspace = true }
+gutenberg-images = { workspace = true }
+image = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+hayro-syntax = "0.7.2"
+hayro-interpret = { version = "0.7.0", default-features = false, features = ["embed-fonts"] }
+hayro-cmap = "0.1"
+kurbo = { workspace = true }

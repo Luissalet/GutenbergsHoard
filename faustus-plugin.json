@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "gutenberg",
   "name": "Gutenberg's Hoard",
-  "purpose": "Local paginated editorial publishing desk using DesignCraft's native layout engine and complete MCP control surface.",
+  "purpose": "Local editorial publishing with incorporated layout engine, complete desktop editor, editable stories/pages and PDF export.",
   "capabilities": [
     "publication-catalog",
     "native-designcraft-documents",
@@ -13,9 +13,20 @@
     "multipage-native-pdf",
     "multipage-raster-pdf",
     "hoard-source-references",
-    "hub-work-profiles"
+    "hub-work-profiles",
+    "owned-editorial-engine",
+    "owned-desktop-editor",
+    "gutenberg-native-archives",
+    "historical-document-import",
+    "engine-mcp-discovery",
+    "engine-mcp-dispatch"
   ],
-  "placeholders": ["GUTENBERG_DIR", "PYTHON", "APP_URL", "TOKEN_FILE"],
+  "placeholders": [
+    "GUTENBERG_DIR",
+    "PYTHON",
+    "APP_URL",
+    "TOKEN_FILE"
+  ],
   "defaults": {
     "APP_URL": "http://127.0.0.1:5218",
     "TOKEN_FILE": "{GUTENBERG_DIR}/data/mcp-token",
@@ -24,12 +35,28 @@
   "app": {
     "url_default": "{APP_URL}",
     "ui_url": "{APP_URL}",
-    "health": {"path": "/api/health", "expect": {"service": "gutenbergs-hoard"}},
-    "identify": {"service": ["gutenbergs-hoard"], "title": ["gutenberg's hoard", "gutenberg"]},
+    "health": {
+      "path": "/api/health",
+      "expect": {
+        "service": "gutenbergs-hoard"
+      }
+    },
+    "identify": {
+      "service": [
+        "gutenbergs-hoard"
+      ],
+      "title": [
+        "gutenberg's hoard",
+        "gutenberg"
+      ]
+    },
     "launch_hint": {
       "kind": "process",
       "executable": "{PYTHON}",
-      "argv": ["-m", "gutenberg_hoard"],
+      "argv": [
+        "-m",
+        "gutenberg_hoard"
+      ],
       "cwd": "{GUTENBERG_DIR}",
       "env": {
         "GUTENBERG_HOST": "127.0.0.1",
@@ -37,21 +64,33 @@
         "GUTENBERG_PORT_STRICT": "1",
         "GUTENBERG_DATA_DIR": "{GUTENBERG_DIR}/data"
       },
-      "readiness": {"url": "{APP_URL}/api/health", "timeout_s": 25}
+      "readiness": {
+        "url": "{APP_URL}/api/health",
+        "timeout_s": 25
+      }
     }
   },
-  "x-family": {"agent_contract": true, "stack": "python", "copilot": true},
+  "x-family": {
+    "agent_contract": true,
+    "stack": "python",
+    "copilot": true
+  },
   "mcp": {
     "transport": "stdio",
     "command": "{PYTHON}",
-    "args": ["-m", "gutenberg_hoard.mcp_server"],
+    "args": [
+      "-m",
+      "gutenberg_hoard.mcp_server"
+    ],
     "cwd": "{GUTENBERG_DIR}",
     "env": {
       "GUTENBERG_DATA_DIR": "{GUTENBERG_DIR}/data",
       "HOARD_APP_ID": "gutenberg",
       "HOARD_TOKEN_FILE": "{TOKEN_FILE}"
     },
-    "optional_env": ["HOARD_HUB_URL"]
+    "optional_env": [
+      "HOARD_HUB_URL"
+    ]
   },
-  "notes": "HoardLink is installed editable into the dedicated .venv. DesignCraft is configured in ignored local-config.json and remains a separate upstream executable. Native PDF export uses DesignCraft file.exportPdf, verifies the artifact and page count, returns engine warnings, and checks text extraction on the exported file. Raster PDF remains available with its existing scale control and RGB page images. Neither path claims PDF/X or PDF/UA conformance. MCP session and native document history is owned by the DesignCraft process while active; Gutenberg snapshots allow undo after restart."
+  "notes": "Owned source and build under native/. Libraries and HoardLink are installed in the dedicated environment; no external app CLI/GUI path is used. Native and raster PDFs retain prior contracts and expose warnings/text checks. Historical names, originals, linked assets, publication IDs and snapshots remain supported. No PDF/X or PDF/UA certification claim."
 }

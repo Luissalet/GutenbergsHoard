@@ -6,3 +6,6 @@ venv/
 data/
 local-config.json
 *.log
+native/target/
+native/bin/
+*.egg-info/

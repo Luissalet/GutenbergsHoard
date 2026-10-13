@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from hoard_link.net import already_running, find_available_port, free_port, open_in_browser, wait_healthy
-from gutenberg_hoard.config import designcraft_cli
+from gutenberg_hoard.config import engine_cli
 
 
 def main() -> int:
@@ -20,15 +20,15 @@ def main() -> int:
         return 0
     port = find_available_port(preferred)
     data = os.environ.get("GUTENBERG_DATA_DIR") or str(ROOT / "data")
-    configured_cli = designcraft_cli()
+    configured_cli = engine_cli()
     cli = str(configured_cli) if configured_cli else ""
     if not cli:
-        print("Set GUTENBERG_DESIGNCRAFT_CLI or configure the DesignCraft path in local-config.json.", file=sys.stderr)
+        print("Build the incorporated engine with python scripts/build_engine.py.", file=sys.stderr)
         return 2
     env = dict(os.environ, GUTENBERG_PORT=str(port), GUTENBERG_PORT_STRICT="1", GUTENBERG_HOST="127.0.0.1", GUTENBERG_DATA_DIR=data,
                GUTENBERG_DESIGNCRAFT_CLI=cli)
-    if not designcraft_cli():
-        print(f"DesignCraft CLI not found: {cli}", file=sys.stderr)
+    if not engine_cli():
+        print(f"Gutenberg engine not found: {cli}", file=sys.stderr)
         return 2
     url = f"http://127.0.0.1:{port}"
     child = subprocess.Popen([sys.executable, "-m", "gutenberg_hoard"], cwd=ROOT, env=env)

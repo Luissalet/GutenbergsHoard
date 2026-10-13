@@ -1,0 +1,20 @@
+[package]
+name = "gutenberg-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Gutenberg MCP server: JSON-RPC 2.0 over stdio, driving a running app or a headless session"
+
+[lints]
+workspace = true
+
+[dependencies]
+gutenberg-engine = { workspace = true }
+gutenberg-render = { workspace = true }
+gutenberg-tools = { workspace = true }
+gutenberg-geom = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+image = { workspace = true }

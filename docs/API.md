@@ -1,0 +1,17 @@
+# Gutenberg editorial API and MCP
+
+The incorporated engine has25 live native tools and432 commands. The product's normal HTTP agent contract and stdio MCP both expose19 tools; publishing handlers share the document, story, snapshot and cross-process locking implementation.
+
+Primary engine names are `gutenberg_engine_catalog`, `gutenberg_engine_cli`, `gutenberg_engine_session` and `gutenberg_engine_raw_session`. The four `gutenberg_designcraft_*` names remain historical aliases with the same inputs/handlers. `gutenberg_render_page` creates an actual PNG preview by publication/page/scale; `gutenberg_open_editor` opens the complete built desktop editor, returning its executable, PID and control port. The remaining publication, story, parent-page, CMYK-swatch, undo, PDF and source-reference tools retain their names and behavior.
+
+REST `/api/engine/catalog` is primary; `/api/native/catalog` remains valid. `/api/publications`, publication inspection/story/parent/swatch/preview/undo/native-actions/export endpoints and `/api/agent/tools` + `/api/agent/call` retain prior contracts. The standard agent token is preserved. Native editor opening remains `/api/native/launch?publication_id=ID`.
+
+New documents use `.gutenberg`, `application/vnd.gutenberg+zip`, `meta.format=gutenberg` and the owned generator. Historical `.designcraft` ZIP/JSON containers are read toward a separate working copy, never written by ordinary publication editing. IDs, profiles and old snapshots remain; nullable `original_native_path` retains the original source path. Copies stay beside the original to preserve relative linked-asset bases. Historical built-in CMYK profile names remain aliases of the incorporated press model. A historical snapshot can retain its old container until a new save writes the owned format.
+
+For tracked publications, story updates with `base_text` still compare against the actual current story, refusing stale updates without overwriting it. Mutating responses include `publication.undo_available` as well as the existing top-level edit flag, so the browser can enable Undo immediately. Snapshot undo survives the engine process ending. Native engine history within a raw persistent session retains its original lifetime; raw explicit file destinations remain caller-selected operations.
+
+PDF defaults remain raster for historical API/MCP callers; `renderer="native"` uses the incorporated native PDF exporter. Receipts report actual page count, warnings and whether any extractable text exists. Raster yields RGB page images; neither mode certifies PDF/X/PDF/UA or universal story searchability. Page numbering for preview/parent operations is zero-based.
+
+Only binaries built from `native/` under `native/bin/` are selected. Historical configured paths/variables are retained as data and cannot select an external app. Missing binaries produce a build instruction. Playwright is not a runtime dependency of this editorial app; its desktop renderer, composition and font libraries are local Rust code. The Python runtime uses the shared HoardLink library and the dedicated environment declared by the manifest.
+
+For isolated QA, set an explicit `GUTENBERG_DATA_DIR`, disable family events/automatic registration, and use a private port. Build with `python scripts/build_engine.py --debug` or release without the flag. Rust1.95 and Cargo.lock make the source build reproducible; no source-origin checkout or application is needed at runtime.
