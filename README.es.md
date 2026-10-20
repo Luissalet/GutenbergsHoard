@@ -1,3 +1,7 @@
+> **Absorbido por [Writer's Hoard](https://github.com/Luissalet/Writers-Hoard-Desktop).**
+> Las funciones de este proyecto se mantienen en el Hoard fusionado, con módulos independientes y apagados inicialmente.
+> El código y las instrucciones siguientes se conservan como referencia histórica; usa el repositorio enlazado para la instalación actual.
+
 # Gutenberg's Hoard
 
 **Un espacio local para publicaciones editoriales paginadas.** Gutenberg organiza los documentos de publicación y sus referencias de origen. El motor incorporado de Gutenberg es responsable de la maquetación nativa, las historias, los marcos, las páginas maestras, los estilos, las muestras de color, el historial y el renderizado.

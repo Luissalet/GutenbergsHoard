@@ -1,3 +1,7 @@
+> **Absorbed by [Writer's Hoard](https://github.com/Luissalet/Writers-Hoard-Desktop).**
+> This project's capabilities are maintained in the merged Hoard, with independent modules initially disabled.
+> The code and instructions below remain as historical reference; use the linked repository for the current installation.
+
 # Gutenberg's Hoard
 
 **A local publication desk for paginated editorial work.** Gutenberg manages publication files and their source links. The incorporated Gutenberg engine owns the native page layout, stories, frames, parent pages, styles, swatches, history and rendering.
